@@ -68,6 +68,10 @@ def settings_file() -> Path:
     return user_dir() / "settings.json"
 
 
+def copilot_db_file() -> Path:
+    return user_dir() / "copilot.sqlite3"
+
+
 def web_dist_dir() -> Path:
     """The built UI. ``npm run build`` in ``web/`` writes it here."""
     return _PACKAGE_DIR / "static"

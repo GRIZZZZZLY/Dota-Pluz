@@ -59,6 +59,9 @@ ignore = ["PLR0913", "PLR0917", "PLR2004", "S101", "S311", "E501", "PLR0912", "P
 "tests/**" = ["PT018", "PT011", "S105", "S106"]
 # Explorer SQL interpolates only integers computed in this file; OpenDota's explorer is read only.
 "src/d2bg/pipeline/refresh.py" = ["S608"]
+# Copilot advice is written in Russian; Cyrillic letters are intended, not look-alikes.
+"src/d2bg/copilot/**" = ["RUF001"]
+"tests/d2bg/test_copilot.py" = ["RUF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["d2bg"]

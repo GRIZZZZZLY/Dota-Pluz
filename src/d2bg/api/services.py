@@ -11,6 +11,8 @@ from fastapi import Request
 
 from d2bg import paths
 from d2bg.context import AppContext
+from d2bg.copilot.pipeline import Copilot
+from d2bg.copilot.store import CopilotStore
 from d2bg.gsi.recorder import Player, Recorder
 from d2bg.live.engine import LiveEngine
 from d2bg.matches.postgame import PostGame
@@ -34,8 +36,10 @@ class Services:
         self.postgame = PostGame(ctx)
         self.player: Player | None = None
         self.refresh = RefreshJob()
+        self.copilot = Copilot(ctx, CopilotStore(paths.copilot_db_file()))
+        self.copilot_error: str | None = None
         self.engine = LiveEngine(
-            ctx, on_post_game=self._post_game, on_account=self._account, on_payload=self._record
+            ctx, on_post_game=self._post_game, on_account=self._account, on_payload=self._on_payload
         )
 
     def _post_game(self, match_id: str) -> None:
@@ -48,6 +52,16 @@ class Services:
     def _record(self, payload: Mapping[str, Any], source: str) -> None:
         if source == "game" and self.ctx.settings.get().record_gsi:
             self.recorder.write(payload)
+
+    def _on_payload(self, payload: Mapping[str, Any], source: str) -> None:
+        self._record(payload, source)
+        recording = self.recorder.current if source == "game" and self.ctx.settings.get().record_gsi else None
+        try:
+            self.copilot.observe(
+                self.engine, source, (recording.name, self.recorder.lines) if recording else None
+            )
+        except Exception as exc:  # the Copilot is an add-on: its failure never stops the live view
+            self.copilot_error = f"{type(exc).__name__}: {exc}"
 
     def start_player(self, frames: list[tuple[float, dict[str, Any]]], source: str, speed: float) -> None:
         with self.lock:
@@ -70,6 +84,7 @@ class Services:
     def close(self) -> None:
         self.stop_player()
         self.recorder.close()
+        self.copilot.store.close()
 
 
 def services(request: Request) -> Services:

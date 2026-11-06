@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from d2bg import __version__, paths
-from d2bg.api import knowledge_routes, live_routes, player_routes
+from d2bg.api import copilot_routes, knowledge_routes, live_routes, player_routes
 from d2bg.api.services import Services
 from d2bg.context import AppContext
 
@@ -68,6 +68,7 @@ def create_app(
         return {"ok": True, "version": __version__}
 
     app.include_router(live_routes.router)
+    app.include_router(copilot_routes.router)
     app.include_router(knowledge_routes.router)
     app.include_router(player_routes.router)
 
