@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -53,6 +54,7 @@ def sources(shared_ctx) -> dict[str, Callable[[], Payloads]]:
         return cache[name]
 
     draft, pre = "player_draft_ranked.jsonl.gz", "player_pre_game.jsonl.gz"
+    largo = "player_lobby_largo.jsonl.gz"
     return {
         "demo full match": demo,
         "start at 5:00": lambda: [p for p in demo() if clock(p) >= 300],
@@ -75,6 +77,8 @@ def sources(shared_ctx) -> dict[str, Callable[[], Payloads]]:
         "real draft then real game": lambda: real(draft) + real(pre),
         "real game, every 3rd packet": lambda: real(pre)[::3],
         "real game repeated": lambda: real(pre) + real(pre),
+        "real lobby game as Largo (10 min)": lambda: real(largo),
+        "real lobby game as Largo, every 2nd packet": lambda: real(largo)[::2],
     }
 
 
@@ -100,6 +104,8 @@ SCENARIOS = [
     "real draft then real game",
     "real game, every 3rd packet",
     "real game repeated",
+    "real lobby game as Largo (10 min)",
+    "real lobby game as Largo, every 2nd packet",
 ]
 
 
@@ -184,3 +190,41 @@ def test_a_recorded_match_replays_to_the_same_journal(shared_ctx, sources, tmp_p
     run(shared_ctx, payloads, live)
     run(shared_ctx, replayed, again)
     assert journal(again) == journal(live) and journal(live)
+
+
+def test_real_lobby_game_journal(shared_ctx, sources):
+    """His bot lobby as Largo (2026-11-07, anonymised): the teams from the minimap, advice he took marked
+    as followed, one row per piece of advice, and no fake levelling while Amphibian Rhapsody hides the
+    basic abilities behind its songs."""
+    payloads = sources["real lobby game as Largo (10 min)"]()
+    engine = LiveEngine(shared_ctx)
+    for p in payloads:
+        engine.ingest(p, source="replay")
+    draft = engine.snapshot()["draft"]
+    name = shared_ctx.data.heroes.name
+    assert {name(h) for h in draft["allies"]} == {
+        "Largo",
+        "Drow Ranger",
+        "Witch Doctor",
+        "Phantom Assassin",
+        "Luna",
+    }
+    assert {name(h) for h in draft["enemies"]} == {
+        "Kunkka",
+        "Oracle",
+        "Death Prophet",
+        "Bloodseeker",
+        "Jakiro",
+    }
+
+    store = CopilotStore(":memory:")
+    events, _ = run(shared_ctx, payloads, store)
+    journal = store.recommendations("1000000003", 500)
+    statuses = {(r.type, r.status) for r in journal}
+    assert ("SKILL_LEVEL", "followed") in statuses and ("ITEM_NEXT", "followed") in statuses
+    levelled = [e.detail for e in events if e.type == "skill_leveled" and not e.detail.startswith("talent")]
+    assert len(levelled) == len(set(levelled)) and not any("song" in d for d in levelled)
+    items = [
+        r.candidate_id for r in sorted(journal, key=lambda r: r.game_time_s or 0) if r.type == "ITEM_NEXT"
+    ]
+    assert all(a != b for a, b in pairwise(items))  # one row per piece of advice

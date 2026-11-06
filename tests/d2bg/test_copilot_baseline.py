@@ -324,3 +324,47 @@ def test_dismiss_hides_a_recommendation_for_good(client, shared_ctx):
     status = client.get("/api/copilot/status").json()
     assert isinstance(status["rejected"], list)
     assert client.get("/api/copilot/recommendations", params={"status": "nonsense"}).status_code == 422
+
+
+def test_an_ultimate_that_hides_abilities_does_not_free_skill_points(shared_ctx):
+    """His real game as Largo: Amphibian Rhapsody swaps his three abilities for hidden songs while it
+    lasts, so GSI stops listing them. Their ranks are remembered: no free points, no fake levelling."""
+
+    def payload(clock, abilities):
+        return {
+            "map": {
+                "matchid": "77",
+                "game_state": "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS",
+                "clock_time": clock,
+            },
+            "player": {"team_name": "radiant", "gold": 500, "gpm": 400, "xpm": 400},
+            "hero": {"name": "npc_dota_hero_largo", "level": 7},
+            "abilities": {
+                f"ability{i}": {"name": k, "level": lv, "ultimate": k.endswith("rhapsody")}
+                for i, (k, lv) in enumerate(abilities)
+            },
+        }
+
+    basics = [
+        ("largo_catchy_lick", 2),
+        ("largo_frogstomp", 3),
+        ("largo_croak_of_genius", 1),
+        ("largo_amphibian_rhapsody", 1),
+    ]
+    songs = [
+        ("largo_song_fight_song", 1),
+        ("largo_song_double_time", 1),
+        ("largo_song_good_vibrations", 1),
+        ("largo_amphibian_rhapsody", 1),
+    ]
+    engine, store = LiveEngine(shared_ctx), CopilotStore(":memory:")
+    copilot = Copilot(shared_ctx, store)
+    events = []
+    for clock, abilities in ((400, basics), (401, basics), (440, songs), (460, songs), (470, basics)):
+        engine.ingest(payload(clock, abilities), source="replay")
+        events += copilot.observe(engine, "replay")
+        skills = engine.snapshot()["skills"]
+        assert skills["unspent"] == 0 and skills["ranks"]["largo_frogstomp"] == 3
+        assert "largo_song_fight_song" not in skills["ranks"]  # songs take no skill points
+        assert copilot.context.available_skill_points == 0
+    assert [e for e in events if e.type == "skill_leveled"] == []

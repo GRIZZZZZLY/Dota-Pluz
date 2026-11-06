@@ -19,7 +19,7 @@ from d2bg.builds.guide import build_order, next_items
 from d2bg.builds.skills import next_skill
 from d2bg.context import AppContext
 from d2bg.draft.advisor import counters
-from d2bg.gsi.state import GameState, parse, unspent_skill_points
+from d2bg.gsi.state import GameState, parse
 from d2bg.knowledge.counters import situational_items
 from d2bg.knowledge.timers import TimerState, fmt, upcoming
 
@@ -153,6 +153,10 @@ class LiveEngine:
         # Picks read from the draft screen (d2bg-cv) and his own corrections on the Draft page.
         self.screen: dict[str, Any] | None = None
         self.draft_manual: dict[str, list[int]] | None = None
+        # Each learnable ability's last known rank. Some ultimates swap the hero's abilities out for a
+        # while (Largo's songs); GSI then stops listing them, and their ranks must not drop to 0.
+        self.ability_ranks: dict[str, int] = {}
+        self.ultimates: set[str] = set()
 
     def reset(self) -> None:
         with self._lock:
@@ -256,6 +260,15 @@ class LiveEngine:
                 self._enemy_items[(p.team, p.slot)] = have
         else:
             self._track_player_draft(s)
+        # Ability ranks, kept for abilities the game does not list right now.
+        data_hero = self.ctx.data.heroes.get(s.hero.id) if s.hero and s.hero.id and not s.spectating else None
+        if data_hero:
+            learnable = {a.key for a in data_hero.abilities if "Hidden" not in a.behavior}
+            for a in s.abilities:
+                if a.key in learnable:
+                    self.ability_ranks[a.key] = a.level
+                    if a.ultimate:
+                        self.ultimates.add(a.key)
         # Series for the chart.
         if (
             clock is not None
@@ -542,13 +555,23 @@ class LiveEngine:
             else:
                 out["buyback_warning"] = None
             # Skills.
-            # Only the hero's own abilities: GSI also lists cosmetic and event ones with levels.
+            # Only abilities skill points go into: GSI also lists cosmetic and event abilities with
+            # levels, and hidden ones (innate passives, Largo's songs). Ranks come from memory while
+            # the game hides an ability.
             ability_names = {a.key: a.name for a in hero.abilities}
             own_abilities = [a for a in s.abilities if a.key in ability_names]
-            points = unspent_skill_points(s, ability_names)
+            ranks = {
+                a.key: self.ability_ranks.get(a.key, 0) for a in hero.abilities if "Hidden" not in a.behavior
+            }
+            ultimates = self.ultimates & set(ranks)
+            points = (
+                max(s.hero.level - sum(ranks.values()) - (s.hero.attributes_level or 0), 0)
+                if s.hero.level is not None and self.ability_ranks
+                else None
+            )
             suggestion = next_skill(
-                {a.key: a.level for a in own_abilities},
-                {a.key for a in own_abilities if a.ultimate},
+                ranks,
+                ultimates,
                 s.hero.level or 0,
                 (pro.get("skills") or {}).get("by_level", []),
                 ctx.data.load("abilities.json"),
@@ -574,6 +597,8 @@ class LiveEngine:
                     }
                     for a in own_abilities
                 ],
+                "ranks": ranks,
+                "ultimates": sorted(ultimates),
             }
             if points and points > 0 and suggestion and s.hero.level:
                 self._alert(

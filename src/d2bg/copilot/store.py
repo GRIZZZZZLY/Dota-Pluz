@@ -173,6 +173,22 @@ class CopilotStore:
                 tuple(row.values()),
             )
 
+    def refresh_recommendation(self, rec_id: str, rec: Recommendation) -> None:
+        """Same advice, new reasons (a part bought, a level gained): update the shown row in place."""
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE recommendations SET evidence_ids = ?, reason_ru = ?, alternatives = ?, confidence = ?, "
+                "context_hash = ? WHERE id = ? AND status = 'suggested'",
+                (
+                    json.dumps(rec.evidence_ids),
+                    rec.reason_ru,
+                    json.dumps(rec.alternatives),
+                    rec.confidence,
+                    rec.context_hash,
+                    rec_id,
+                ),
+            )
+
     def set_status(self, rec_id: str, status: RecStatus) -> bool:
         """Close a shown recommendation. Only a ``suggested`` one changes, so a dismissal sticks."""
         with self._lock, self._db:

@@ -18,7 +18,6 @@ from d2bg.context import AppContext
 from d2bg.copilot import baseline
 from d2bg.copilot.models import CopilotEvent, EventType, GameContext, RecStatus, Source
 from d2bg.copilot.store import CopilotStore
-from d2bg.gsi.state import unspent_skill_points
 from d2bg.live.engine import LiveEngine
 
 
@@ -47,9 +46,8 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
     positions = app.settings.get().positions
     position = positions[0] if len(positions) == 1 else None
     hero = s.hero if s.hero and s.hero.id else None
-    data_hero = app.data.heroes.get(hero.id) if hero and hero.id else None
-    own = {a.key for a in data_hero.abilities} if data_hero else set()
-    abilities = [a for a in s.abilities if a.key in own]
+    # Ranks, the ultimate and free points as the engine counts them (it remembers hidden abilities).
+    skills = (snap.get("skills") or {}) if hero else {}
     st = s.stats
     c = GameContext(
         match_id=s.match_id,
@@ -62,9 +60,9 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
         position=position,
         level=hero.level if hero else None,
         alive=hero.alive if hero else None,
-        available_skill_points=unspent_skill_points(s, own) if data_hero else None,
-        learned_skills={a.key: a.level for a in abilities},
-        ultimates=[a.key for a in abilities if a.ultimate],
+        available_skill_points=skills.get("unspent"),
+        learned_skills=dict(skills.get("ranks") or {}),
+        ultimates=list(skills.get("ultimates") or []),
         talents=list(hero.talents) if hero else [],
         allies=allies,
         enemies_visible=enemies,
@@ -243,9 +241,12 @@ class Copilot:
             changed_talents = prev is not None and prev.talents != cur.talents
             for key, (rec_id, candidate, evidence) in list(self._active.items()):
                 new = produced.get(key)
-                # Same advice for the same reasons stays; new reasons (a part sold, another enemy
-                # seen) replace it, so a shown recommendation never cites a fact that is gone.
-                if new is not None and (new.candidate_id, tuple(new.evidence_ids)) == (candidate, evidence):
+                if new is not None and new.candidate_id == candidate:
+                    # Same advice: it stays one row. New reasons (a part bought or sold, a level
+                    # gained) are written into it, so it never cites a fact that is gone.
+                    if tuple(new.evidence_ids) != evidence:
+                        self.store.refresh_recommendation(rec_id, new)
+                        self._active[key] = (rec_id, candidate, tuple(new.evidence_ids))
                     continue
                 kind = key.split(":")[0]
                 self.store.set_status(rec_id, _closing_status(kind, candidate, events, changed_talents))
