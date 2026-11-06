@@ -1,12 +1,13 @@
-"""Copilot status and its journal of recommendations. Read only; nothing here talks to the game."""
+"""Copilot status and its journal of recommendations. Nothing here talks to the game."""
 
 from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from d2bg.api.services import Services, services
+from d2bg.copilot.models import RecStatus
 
 router = APIRouter(prefix="/api/copilot")
 Svc = Annotated[Services, Depends(services)]
@@ -35,16 +36,28 @@ def status(svc: Svc) -> dict[str, Any]:
         "context": context.model_dump(),
         "providers": {"baseline": {"configured": True, "online": True}},
         "journal": svc.copilot.store.counts(),
+        "rejected": svc.copilot.rejected,
         "error": svc.copilot_error,
     }
 
 
 @router.get("/recommendations")
 def recommendations(
-    svc: Svc, match_id: str | None = None, limit: Annotated[int, Query(ge=1, le=500)] = 50
+    svc: Svc,
+    match_id: str | None = None,
+    status: RecStatus | None = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ) -> list[dict[str, Any]]:
-    """Newest first, for ``match_id`` or the current match."""
+    """Newest first, for ``match_id`` or the current match. ``status=suggested`` is what to show now."""
     match = match_id or svc.copilot.context.match_id
     if match is None:
         return []
-    return [r.model_dump() for r in svc.copilot.store.recommendations(match, limit)]
+    return [r.model_dump() for r in svc.copilot.store.recommendations(match, limit, status)]
+
+
+@router.post("/recommendations/{rec_id}/dismiss")
+def dismiss(svc: Svc, rec_id: str) -> dict[str, bool]:
+    """The player hid this advice. It stays hidden until the candidate changes."""
+    if not svc.copilot.store.set_status(rec_id, "dismissed"):
+        raise HTTPException(404, "No shown recommendation with this id")
+    return {"ok": True}

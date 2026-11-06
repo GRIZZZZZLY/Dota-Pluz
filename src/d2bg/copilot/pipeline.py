@@ -1,16 +1,13 @@
-"""Copilot pipeline, stage 1: live state -> GameContext -> events -> baseline recommendations -> SQLite.
+"""Copilot pipeline: live state -> GameContext -> events -> checked recommendations -> SQLite journal.
 
-It runs after each LiveEngine update (the engine's ``on_payload`` hook) and changes nothing the engine
-does. Recommendations are recomputed only when an event happens, never on every tick, and stored
-only when the candidate changes. The baseline here re-labels what LiveEngine already computes (the pro
-item order and the most common pro skill at each step); the checks that a skill can be levelled and
-the item rules arrive with the stage 2 validator.
+It runs after each LiveEngine update (the engine's ``on_payload`` hook). Recommendations are recomputed
+only when an event happens, never on every tick, and a new row is stored only when the candidate of a
+type and category changes. A replaced recommendation is closed as ``followed`` when the game shows he
+did it, ``unknown`` when that cannot be checked, otherwise ``expired``.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import threading
 import time
 from collections import Counter
@@ -18,20 +15,11 @@ from collections.abc import Callable
 from typing import Any
 
 from d2bg.context import AppContext
-from d2bg.copilot.models import (
-    ConfidenceKind,
-    CopilotEvent,
-    EventType,
-    GameContext,
-    Recommendation,
-    RecType,
-    Source,
-)
+from d2bg.copilot import baseline
+from d2bg.copilot.models import CopilotEvent, EventType, GameContext, RecStatus, Source
 from d2bg.copilot.store import CopilotStore
 from d2bg.gsi.state import unspent_skill_points
 from d2bg.live.engine import LiveEngine
-
-BASELINE_VERSION = "baseline-0.1"
 
 
 def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContext:
@@ -40,12 +28,16 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
     s = engine.state
     if s is None:
         return GameContext(patch=patch, sources=_sources(patch="snapshot"))
+    snap = engine.snapshot()
     # The engine keeps the last draft after a match ends; outside a match it is not this context's.
-    draft = (engine.snapshot().get("draft") or {}) if s.match_id else {}
+    draft = (snap.get("draft") or {}) if s.match_id else {}
     allies, enemies = list(draft.get("allies") or []), list(draft.get("enemies") or [])
     positions = app.settings.get().positions
     position = positions[0] if len(positions) == 1 else None
     hero = s.hero if s.hero and s.hero.id else None
+    data_hero = app.data.heroes.get(hero.id) if hero and hero.id else None
+    own = {a.key for a in data_hero.abilities} if data_hero else set()
+    abilities = [a for a in s.abilities if a.key in own]
     st = s.stats
     c = GameContext(
         match_id=s.match_id,
@@ -58,8 +50,10 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
         position=position,
         level=hero.level if hero else None,
         alive=hero.alive if hero else None,
-        available_skill_points=unspent_skill_points(s) if hero else None,
-        learned_skills={a.key: a.level for a in s.abilities} if hero else {},
+        available_skill_points=unspent_skill_points(s, own) if data_hero else None,
+        learned_skills={a.key: a.level for a in abilities},
+        ultimates=[a.key for a in abilities if a.ultimate],
+        talents=list(hero.talents) if hero else [],
         allies=allies,
         enemies_visible=enemies,
         inventory=[i.key for i in s.inventory],
@@ -70,6 +64,7 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
         gpm=st.gpm if st else None,
         xpm=st.xpm if st else None,
         last_hits=st.last_hits if st else None,
+        gold_targets=_gold_targets(snap, s.clock, hero.buyback_cost if hero else None),
         data_age_s=None if engine.last_packet_at is None else round(now - engine.last_packet_at, 3),
         sources=_sources(
             match="gsi" if s.match_id else "unknown",
@@ -88,6 +83,16 @@ def _sources(**known: Source) -> dict[str, Source]:
     return {**GameContext().sources, **known}
 
 
+def _gold_targets(snap: dict[str, Any], clock: float | None, buyback: int | None) -> dict[str, int]:
+    """Where the buyback guard flips: once he can afford the next item, and once he can afford it and
+    still keep the buyback. Only from minute 30, when the guard applies."""
+    items = snap.get("next_items") or []
+    if not items or not buyback or clock is None or clock < baseline.BUYBACK_FROM_S:
+        return {}
+    remaining = int(items[0]["remaining"])
+    return {"next_item": remaining, "next_item_and_buyback": remaining + buyback}
+
+
 def _evidence(c: GameContext, app: AppContext) -> list[str]:
     """Ids of the facts a recommendation may cite. A citation outside this list is rejected."""
     out = []
@@ -97,6 +102,10 @@ def _evidence(c: GameContext, app: AppContext) -> list[str]:
             out.append(f"build:{c.hero_key}")
     if c.level:
         out.append(f"level:{c.level}")
+    if c.gold is not None:
+        out.append(f"gold:{c.gold}")
+    if c.buyback_cost:
+        out.append(f"buyback_cost:{c.buyback_cost}")
     out += [f"inventory:{k}" for k in sorted(set(c.owned))]
     for prefix, ids in (("ally", c.allies), ("enemy", c.enemies_visible)):
         for hero_id in ids:
@@ -130,6 +139,9 @@ def diff_events(prev: GameContext | None, cur: GameContext) -> list[CopilotEvent
     for key, level in cur.learned_skills.items():
         if level > prev.learned_skills.get(key, 0):
             add("skill_leveled", f"{key}:{level}")
+    for i, (was, now) in enumerate(zip(prev.talents, cur.talents, strict=False)):
+        if now and not was:
+            add("skill_leveled", f"talent_{i + 1}")
     now_owned, before = Counter(cur.owned), Counter(prev.owned)
     out_items = [f"+{k}" for k in sorted(now_owned - before)] + [f"-{k}" for k in sorted(before - now_owned)]
     for detail in out_items:
@@ -140,100 +152,29 @@ def diff_events(prev: GameContext | None, cur: GameContext) -> list[CopilotEvent
         add("death")
     elif prev.alive is False and cur.alive is True:
         add("respawn")
+    if cur.gold is not None and prev.gold is not None:
+        for name, target in cur.gold_targets.items():
+            before_target = prev.gold_targets.get(name)
+            reached_before = before_target is not None and prev.gold >= before_target
+            if reached_before != (cur.gold >= target):
+                add("gold_threshold_crossed", f"{name}:{'up' if cur.gold >= target else 'down'}")
     if cur.phase == "post_game" and prev.phase != "post_game":
         add("match_finished")
     return out
 
 
-def context_hash(c: GameContext) -> str:
-    """Hash of the inputs a recommendation depends on (not the clock, not gold)."""
-    key = {
-        "hero": c.hero_id,
-        "level": c.level,
-        "skills": c.learned_skills,
-        "owned": sorted(c.owned),
-        "allies": sorted(c.allies),
-        "enemies": sorted(c.enemies_visible),
-        "position": c.position,
-        "patch": c.patch,
-    }
-    return hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
-
-
-def baseline(c: GameContext, snap: dict[str, Any], app: AppContext) -> list[Recommendation]:
-    """LiveEngine's own suggestions as Recommendations. No network, no model."""
-    if not c.match_id or not c.hero_key:
-        return []
-    h = context_hash(c)
-    out = []
-    items = snap.get("next_items") or []
-    if items:
-        first = items[0]
-        item = app.data.items.get(first["item"])
-        parts = set(item.components or []) if item else set()
-        out.append(
-            _rec(
-                c,
-                h,
-                "ITEM_NEXT",
-                first["item"],
-                alternatives=[i["item"] for i in items[1:]],
-                reason_ru=(
-                    f"Следующий предмет в порядке pro-сборки героя; с учётом собранных частей "
-                    f"осталось {first['remaining']} золота"
-                ),
-                evidence=[f"build:{c.hero_key}", *(f"inventory:{k}" for k in sorted(set(c.owned) & parts))],
-            )
-        )
-    skills = snap.get("skills") or {}
-    nxt = skills.get("next")
-    # ponytail: only "has a point and the ability exists"; max rank and level gates come with stage 2.
-    if nxt and (skills.get("unspent") or 0) > 0 and nxt["ability"] in c.learned_skills:
-        out.append(
-            _rec(
-                c,
-                h,
-                "SKILL_LEVEL",
-                nxt["ability"],
-                reason_ru=f"Профессионалы на этом шаге чаще всего берут {nxt['name']} ({nxt['share']:.0%})",
-                confidence=nxt["share"],
-                confidence_kind="pro_pick_share",
-                evidence=[f"build:{c.hero_key}", f"level:{c.level}"],
-            )
-        )
-    return out
-
-
-def _rec(
-    c: GameContext,
-    h: str,
-    kind: RecType,
-    candidate: str,
-    *,
-    reason_ru: str,
-    evidence: list[str],
-    alternatives: list[str] | None = None,
-    confidence: float | None = None,
-    confidence_kind: ConfidenceKind = "none",
-) -> Recommendation:
-    match_id = c.match_id or ""
-    rid = hashlib.sha256(f"{match_id}|{kind}|{candidate}|{h}".encode()).hexdigest()[:20]
-    return Recommendation(
-        id=rid,
-        match_id=match_id,
-        game_time_s=c.time_s,
-        type=kind,
-        candidate_id=candidate,
-        alternatives=alternatives or [],
-        reason_ru=reason_ru,
-        source="baseline",
-        confidence=confidence,
-        confidence_kind=confidence_kind,
-        evidence_ids=evidence,
-        context_hash=h,
-        model_version=BASELINE_VERSION,
-        data_patch=c.patch,
-    )
+def _closing_status(
+    kind: str, candidate: str, events: list[CopilotEvent], changed_talents: bool
+) -> RecStatus:
+    """What became of a recommendation that is no longer the current one."""
+    seen = {(e.type, e.detail) for e in events}
+    if kind in ("ITEM_NEXT", "ITEM_SITUATIONAL") and ("item_changed", f"+{candidate}") in seen:
+        return "followed"
+    if kind == "SKILL_LEVEL" and any(t == "skill_leveled" and d.startswith(f"{candidate}:") for t, d in seen):
+        return "followed"
+    if kind == "TALENT" and changed_talents:
+        return "unknown"  # GSI says a talent of the tier was taken, not which of the two
+    return "expired"
 
 
 class Copilot:
@@ -245,7 +186,15 @@ class Copilot:
         self._clock = clock
         self._lock = threading.Lock()
         self.context = GameContext(patch=app.data.patch)
-        self._active: dict[str, str] = {}  # type -> candidate shown now
+        # "TYPE:category" -> (recommendation id, candidate, evidence) shown now.
+        self._active: dict[str, tuple[str, str, tuple[str, ...]]] = {}
+        # Candidates the validator refused at the last recompute, for the status page.
+        self.rejected: list[dict[str, str]] = []
+
+    def _close_all(self) -> None:
+        for rec_id, _, _ in self._active.values():
+            self.store.set_status(rec_id, "expired")
+        self._active.clear()
 
     def observe(
         self, engine: LiveEngine, source: str, recording: tuple[str, int] | None = None
@@ -256,24 +205,39 @@ class Copilot:
             cur = build_context(engine, self.app, now)
             events = diff_events(prev, cur)
             self.context = cur
+            if prev is not None and cur.match_id is None:
+                self._close_all()  # back in the menu: a cancelled or finished match
             if not events:
                 return events
             if any(e.type == "match_started" for e in events):
-                self._active.clear()
+                self._close_all()
+                # Advice left open by an earlier run (the app was closed mid-match) is not current.
+                self.store.expire_open()
+            elif any(e.type == "match_finished" for e in events):
+                self._close_all()
             file, frame = recording or (None, None)
             self.store.upsert_match(cur, source, now, file)
             self.store.add_events(events, now, file, frame)
-            # A recommendation may only cite facts that exist.
-            recs = [
-                r
-                for r in baseline(cur, engine.snapshot(), self.app)
-                if set(r.evidence_ids) <= set(cur.evidence_ids)
-            ]
-            for rec in recs:
-                if self._active.get(rec.type) != rec.candidate_id:
+            produced = {}
+            self.rejected = []
+            for rec in baseline.recommendations(cur, engine.snapshot(), self.app):
+                why = baseline.rejection(rec, cur, self.app)
+                if why is None:
+                    produced[f"{rec.type}:{rec.category or ''}"] = rec
+                else:
+                    self.rejected.append({"type": rec.type, "candidate": rec.candidate_id, "reason": why})
+            changed_talents = prev is not None and prev.talents != cur.talents
+            for key, (rec_id, candidate, evidence) in list(self._active.items()):
+                new = produced.get(key)
+                # Same advice for the same reasons stays; new reasons (a part sold, another enemy
+                # seen) replace it, so a shown recommendation never cites a fact that is gone.
+                if new is not None and (new.candidate_id, tuple(new.evidence_ids)) == (candidate, evidence):
+                    continue
+                kind = key.split(":")[0]
+                self.store.set_status(rec_id, _closing_status(kind, candidate, events, changed_talents))
+                del self._active[key]
+            for key, rec in produced.items():
+                if key not in self._active:
                     self.store.save_recommendation(rec, now)
-                    self._active[rec.type] = rec.candidate_id
-            for kind in set(self._active) - {r.type for r in recs}:
-                self.store.expire(cur.match_id or "", kind)  # e.g. the skill point was spent
-                del self._active[kind]
+                    self._active[key] = (rec.id, rec.candidate_id, tuple(rec.evidence_ids))
             return events

@@ -88,3 +88,17 @@ test("keyboard shortcuts switch pages", async ({ page }) => {
   await page.keyboard.press("5");
   await expect(page).toHaveURL(/\/meta$/);
 });
+
+test("compact view shows the Copilot's advice and labels the demo", async ({ page, request }) => {
+  await request.post("/api/demo", { data: { hero: "juggernaut", speed: 8, minutes: 6 } });
+  await page.goto("/compact");
+  const copilot = page.getByRole("region", { name: "Copilot" });
+  await expect(copilot).toContainText("Демо-матч, не ваша игра", { timeout: 20_000 });
+  await expect(copilot.getByText("Основной предмет").first()).toBeVisible({ timeout: 30_000 });
+  await request.post("/api/replay/stop"); // freeze the match so the advice stops changing
+  await page.waitForTimeout(2_000);
+  const before = await copilot.getByRole("article").count();
+  await copilot.getByRole("button", { name: /^Скрыть совет/ }).first().click();
+  await expect(copilot.getByRole("article")).toHaveCount(before - 1, { timeout: 10_000 });
+  await request.post("/api/live/reset");
+});

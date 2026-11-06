@@ -307,7 +307,7 @@ export interface LiveSnapshot {
   buyback_warning?: string | null;
   skills?: {
     unspent: number | null;
-    next: { ability: string; name: string; share: number } | null;
+    next: { ability: string; name: string; share: number; n?: number | null; rank?: number } | null;
     abilities: { key: string; name: string; level: number; cooldown: number | null; ultimate: boolean | null }[];
   };
   benchmarks?: { metric: string; label: string; value: number; percentile: number | null; median: number | null }[];
@@ -505,5 +505,53 @@ export interface PostGameJob {
   status: "waiting" | "ready" | "gave_up";
   attempts: number;
   parse_requested: boolean;
+  error: string | null;
+}
+
+// ── Copilot (src/d2bg/api/copilot_routes.py) ─────────────────────
+
+export type RecType =
+  | "PICK_HERO"
+  | "SKILL_LEVEL"
+  | "TALENT"
+  | "ITEM_NEXT"
+  | "ITEM_SITUATIONAL"
+  | "ITEM_BUYBACK_GUARD"
+  | "POSTMATCH_FINDING";
+export type RecStatus = "suggested" | "seen" | "dismissed" | "followed" | "unknown" | "expired";
+export type RecCategory = "core" | "situational" | "defensive" | "buyback";
+
+export interface Recommendation {
+  id: string;
+  match_id: string;
+  game_time_s: number | null;
+  type: RecType;
+  category: RecCategory | null;
+  candidate_id: string;
+  alternatives: string[];
+  reason_ru: string;
+  source: "baseline" | "jev" | "groq" | "hybrid" | "deepseek";
+  /** What the source measured (confidence_kind says what); never a win probability. */
+  confidence: number | null;
+  confidence_kind: "none" | "pro_pick_share" | "unverified_model_score";
+  evidence_ids: string[];
+  context_hash: string;
+  model_version: string;
+  data_patch: string | null;
+  status: RecStatus;
+  expires_at: number | null;
+}
+
+export interface CopilotStatus {
+  state: "no_data" | "stale" | "ok";
+  mode: "game" | "demo" | "replay" | "none";
+  match_id: string | null;
+  phase: string | null;
+  patch: { data: string; timers: string };
+  snapshot_generated_at: number | null;
+  context: { sources: Record<string, string>; data_age_s: number | null; [key: string]: unknown };
+  providers: Record<string, { configured: boolean; online: boolean }>;
+  journal: Record<string, number>;
+  rejected: { type: string; candidate: string; reason: string }[];
   error: string | null;
 }

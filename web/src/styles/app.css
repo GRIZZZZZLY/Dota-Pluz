@@ -1137,6 +1137,21 @@ select.input {
   font-size: var(--step-3);
 }
 
+.tag.warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.copilot .advice {
+  border-left: 3px solid var(--river);
+  padding: 0.4rem 0.6rem;
+  background: var(--river-dim);
+}
+
+.copilot .advice p {
+  margin: 0.25rem 0;
+}
+
 /* ── Setup ─────────────────────────────────────────────────────── */
 
 .steps {

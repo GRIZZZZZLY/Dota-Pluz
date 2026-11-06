@@ -9,7 +9,7 @@ optional: the game leaves blocks out depending on the moment.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -435,13 +435,20 @@ def parse(
     return state
 
 
-def unspent_skill_points(state: GameState) -> int | None:
+def unspent_skill_points(state: GameState, own: Collection[str] | None = None) -> int | None:
     """Skill points not yet spent: one per level, minus ability levels and attribute bonus levels.
 
-    Since 7.40 talents use their own points, so they are not counted here. Returns None without data.
+    Since 7.40 talents use their own points, so they are not counted here. A real game's ``abilities``
+    block also lists levelled cosmetic and event abilities (``plus_high_five``,
+    ``seasonal_dark_carnival_pie`` at level 5, ...); pass the hero's own ability keys as ``own`` so
+    only those count. Returns None without data.
     """
     if not state.hero or state.hero.level is None or not state.abilities:
         return None
-    spent = sum(a.level for a in state.abilities if not a.key.startswith("special_bonus"))
+    spent = sum(
+        a.level
+        for a in state.abilities
+        if not a.key.startswith("special_bonus") and (own is None or a.key in own)
+    )
     spent += state.hero.attributes_level or 0
     return max(state.hero.level - spent, 0)

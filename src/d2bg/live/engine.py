@@ -16,6 +16,7 @@ from typing import Any
 
 from d2bg.builds.benchmarks import compare, percentile_of, value_at
 from d2bg.builds.guide import build_order, next_items
+from d2bg.builds.skills import next_skill
 from d2bg.context import AppContext
 from d2bg.draft.advisor import counters
 from d2bg.gsi.state import GameState, parse, unspent_skill_points
@@ -480,17 +481,25 @@ class LiveEngine:
             else:
                 out["buyback_warning"] = None
             # Skills.
-            points = unspent_skill_points(s)
-            skills = (pro.get("skills") or {}).get("by_level", [])
-            spent = sum(a.level for a in s.abilities)
-            suggestion = skills[spent] if spent < len(skills) else None
+            # Only the hero's own abilities: GSI also lists cosmetic and event ones with levels.
             ability_names = {a.key: a.name for a in hero.abilities}
+            own_abilities = [a for a in s.abilities if a.key in ability_names]
+            points = unspent_skill_points(s, ability_names)
+            suggestion = next_skill(
+                {a.key: a.level for a in own_abilities},
+                {a.key for a in own_abilities if a.ultimate},
+                s.hero.level or 0,
+                (pro.get("skills") or {}).get("by_level", []),
+                ctx.data.load("abilities.json"),
+            )
             out["skills"] = {
                 "unspent": points,
                 "next": {
                     "ability": suggestion["ability"],
                     "name": ability_names.get(suggestion["ability"], suggestion["ability"]),
                     "share": suggestion["share"],
+                    "n": suggestion.get("n"),
+                    "rank": suggestion["rank"],
                 }
                 if suggestion
                 else None,
@@ -502,7 +511,7 @@ class LiveEngine:
                         "cooldown": a.cooldown,
                         "ultimate": a.ultimate,
                     }
-                    for a in s.abilities
+                    for a in own_abilities
                 ],
             }
             if points and points > 0 and suggestion and s.hero.level:

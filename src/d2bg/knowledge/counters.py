@@ -17,11 +17,22 @@ class CounterRule:
     min_heroes: int
     items: tuple[str, ...]
     reason: str
+    # "situational" (answers a trait) or "defensive" (keeps you alive); the Copilot shows them apart.
+    category: str = "situational"
+    reason_ru: str = ""
 
     @classmethod
     def load(cls, doc: Mapping[str, Any]) -> list[CounterRule]:
         return [
-            cls(r["id"], r["trait"], int(r["min_heroes"]), tuple(r["items"]), r["reason"])
+            cls(
+                r["id"],
+                r["trait"],
+                int(r["min_heroes"]),
+                tuple(r["items"]),
+                r["reason"],
+                r.get("category", "situational"),
+                r.get("reason_ru", ""),
+            )
             for r in doc["rules"]
         ]
 
@@ -56,7 +67,10 @@ def situational_items(
             {
                 "id": rule.id,
                 "reason": rule.reason,
+                "reason_ru": rule.reason_ru,
+                "category": rule.category,
                 "heroes": [hero_name(h) for h in holders],
+                "hero_ids": holders,
                 "items": [
                     {
                         "key": key,

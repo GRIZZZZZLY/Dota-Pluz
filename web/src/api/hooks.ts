@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, qs } from "./client";
 import type {
   BuildResponse,
+  CopilotStatus,
   DataStatus,
   DraftRequest,
   DraftResponse,
@@ -18,6 +19,7 @@ import type {
   PostGameJob,
   ProfileResponse,
   RankBucket,
+  Recommendation,
   Recording,
   Settings,
   VersionInfo,
@@ -124,4 +126,23 @@ export function useLive(): { snap: LiveSnapshot | null; online: boolean } {
     };
   }, []);
   return { snap, online };
+}
+
+export const useCopilotStatus = () =>
+  useQuery({ queryKey: ["copilot-status"], queryFn: () => api.get<CopilotStatus>("/api/copilot/status"), refetchInterval: 2000 });
+
+/** What the Copilot advises right now. Polled twice a second on this machine, so new advice shows within 0.5 s of the event. */
+export const useCopilotAdvice = () =>
+  useQuery({
+    queryKey: ["copilot-advice"],
+    queryFn: () => api.get<Recommendation[]>("/api/copilot/recommendations?status=suggested"),
+    refetchInterval: 500,
+  });
+
+export function useDismissAdvice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ ok: boolean }>(`/api/copilot/recommendations/${encodeURIComponent(id)}/dismiss`),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["copilot-advice"] }),
+  });
 }

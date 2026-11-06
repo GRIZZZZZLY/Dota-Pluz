@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from d2bg.copilot.models import CopilotEvent, GameContext, Recommendation
+from d2bg.copilot.models import CopilotEvent, GameContext, Recommendation, RecStatus
 
 MIGRATIONS = [
     """
@@ -64,6 +64,11 @@ MIGRATIONS = [
     CREATE INDEX recommendations_by_time ON recommendations(match_id, game_time_s);
     CREATE INDEX recommendations_by_type ON recommendations(type);
     CREATE INDEX recommendations_by_created ON recommendations(created_at);
+    """,
+    # 2: item groups (core, situational, defensive, buyback), stage 2.
+    """
+    ALTER TABLE recommendations ADD COLUMN category TEXT;
+    CREATE INDEX recommendations_by_status ON recommendations(match_id, status);
     """,
 ]
 _JSON_FIELDS = ("alternatives", "evidence_ids")
@@ -139,10 +144,8 @@ class CopilotStore:
             )
 
     def save_recommendation(self, rec: Recommendation, now: float) -> None:
-        """Store ``rec`` as the active one of its type; the previous active one expires.
-
-        The id is derived from the inputs, so replaying the same match stores nothing twice.
-        """
+        """Store ``rec``. The id is derived from the inputs, so replaying the same match stores nothing
+        twice; a replayed recommendation becomes ``suggested`` again."""
         row = rec.model_dump()
         for name in _JSON_FIELDS:
             row[name] = json.dumps(row[name])
@@ -154,28 +157,36 @@ class CopilotStore:
                 "ON CONFLICT(id) DO UPDATE SET status = excluded.status",
                 tuple(row.values()),
             )
-            self._db.execute(
-                "UPDATE recommendations SET status = 'expired' "
-                "WHERE match_id = ? AND type = ? AND status = 'suggested' AND id != ?",
-                (rec.match_id, rec.type, rec.id),
-            )
 
-    def expire(self, match_id: str, kind: str) -> None:
+    def set_status(self, rec_id: str, status: RecStatus) -> bool:
+        """Close a shown recommendation. Only a ``suggested`` one changes, so a dismissal sticks."""
         with self._lock, self._db:
-            self._db.execute(
-                "UPDATE recommendations SET status = 'expired' "
-                "WHERE match_id = ? AND type = ? AND status = 'suggested'",
-                (match_id, kind),
+            cur = self._db.execute(
+                "UPDATE recommendations SET status = ? WHERE id = ? AND status = 'suggested'",
+                (status, rec_id),
             )
+            return cur.rowcount > 0
+
+    def expire_open(self) -> None:
+        """Close every recommendation still shown. Only one match is live at a time."""
+        with self._lock, self._db:
+            self._db.execute("UPDATE recommendations SET status = 'expired' WHERE status = 'suggested'")
 
     # ── reads ──────────────────────────────────────────────────────
 
-    def recommendations(self, match_id: str | None = None, limit: int = 50) -> list[Recommendation]:
-        sql = "SELECT * FROM recommendations"
-        args: tuple[Any, ...] = ()
+    def recommendations(
+        self, match_id: str | None = None, limit: int = 50, status: RecStatus | None = None
+    ) -> list[Recommendation]:
+        where, args = [], []
         if match_id is not None:
-            sql += " WHERE match_id = ?"
-            args = (match_id,)
+            where.append("match_id = ?")
+            args.append(match_id)
+        if status is not None:
+            where.append("status = ?")
+            args.append(status)
+        sql = "SELECT * FROM recommendations"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY game_time_s DESC, created_at DESC LIMIT ?"
         with self._lock:
             rows = self._db.execute(sql, (*args, limit)).fetchall()

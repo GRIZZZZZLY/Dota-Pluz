@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from d2bg.api.app import create_app
-from d2bg.copilot import pipeline
+from d2bg.copilot import baseline
 from d2bg.copilot.models import GameContext
 from d2bg.copilot.pipeline import Copilot, build_context, diff_events
 from d2bg.copilot.store import MIGRATIONS, CopilotStore
@@ -159,19 +159,20 @@ def test_demo_match_is_journaled(shared_ctx, frames):
     counts = store.counts()
     assert counts["matches"] == 1 and counts["gsi_events_index"] == len(events)
     recs = store.recommendations(DEMO_MATCH_ID, 500)
-    assert {r.type for r in recs} == {"ITEM_NEXT", "SKILL_LEVEL"}
+    assert {r.type for r in recs} == {"ITEM_NEXT", "ITEM_SITUATIONAL", "SKILL_LEVEL"}
+    assert {r.category for r in recs if r.type == "ITEM_SITUATIONAL"} == {"situational", "defensive"}
     for r in recs:
         assert r.source == "baseline" and r.data_patch == shared_ctx.data.patch and r.reason_ru
         assert r.evidence_ids and all(
-            e.split(":")[0] in {"build", "level", "inventory"} for e in r.evidence_ids
+            e.split(":")[0] in {"build", "level", "inventory", "enemy"} for e in r.evidence_ids
         )
         if r.type == "SKILL_LEVEL":
             assert r.confidence_kind == "pro_pick_share" and 0 < (r.confidence or 0) <= 1
         else:
             assert r.confidence is None and r.confidence_kind == "none"
-    # At most one active recommendation per type; the rest were superseded.
-    active = [r.type for r in recs if r.status == "suggested"]
-    assert len(active) == len(set(active)) and any(r.status == "expired" for r in recs)
+    # Every item and skill he took while it was advised is marked as followed; the match end closes the rest.
+    assert {r.status for r in recs} == {"followed", "expired"}
+    assert {r.type for r in recs if r.status == "followed"} == {"ITEM_NEXT", "SKILL_LEVEL"}
     row = store._db.execute("SELECT source, hero_id FROM matches").fetchone()
     assert tuple(row) == ("demo", shared_ctx.data.heroes.require("juggernaut").id)
 
@@ -198,12 +199,12 @@ def test_starting_in_the_middle_of_a_match(shared_ctx, frames):
 
 
 def test_a_recommendation_citing_unknown_facts_is_dropped(shared_ctx, frames, monkeypatch):
-    real = pipeline.baseline
+    real = baseline.recommendations
 
     def citing_ghosts(c, snap, app):
         return [r.model_copy(update={"evidence_ids": ["enemy:not_in_this_game"]}) for r in real(c, snap, app)]
 
-    monkeypatch.setattr(pipeline, "baseline", citing_ghosts)
+    monkeypatch.setattr(baseline, "recommendations", citing_ghosts)
     store = CopilotStore(":memory:")
     feed(shared_ctx, frames[:200], store)
     assert store.counts()["recommendations"] == 0 and store.counts()["gsi_events_index"] > 0
