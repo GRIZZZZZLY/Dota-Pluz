@@ -15,24 +15,24 @@ import { SettingsPage } from "./pages/Settings";
 import { SetupPage } from "./pages/Setup";
 
 const NAV = [
-  { to: "/", label: "Live", key: "1" },
-  { to: "/draft", label: "Draft", key: "2" },
-  { to: "/heroes", label: "Heroes", key: "3" },
-  { to: "/items", label: "Items", key: "4" },
-  { to: "/meta", label: "Meta", key: "5" },
-  { to: "/profile", label: "Profile", key: "6" },
-  { to: "/match", label: "Matches", key: "7" },
-  { to: "/setup", label: "Setup", key: "8" },
-  { to: "/settings", label: "Settings", key: "9" },
+  { to: "/", label: "Матч", key: "1" },
+  { to: "/draft", label: "Драфт", key: "2" },
+  { to: "/heroes", label: "Герои", key: "3" },
+  { to: "/items", label: "Предметы", key: "4" },
+  { to: "/meta", label: "Мета", key: "5" },
+  { to: "/profile", label: "Профиль", key: "6" },
+  { to: "/match", label: "Матчи", key: "7" },
+  { to: "/setup", label: "Подключение", key: "8" },
+  { to: "/settings", label: "Настройки", key: "9" },
 ] as const;
 
 function Shortcuts({ onClose }: { onClose: () => void }) {
   return (
-    <div className="panel kbd-help" role="dialog" aria-label="Keyboard shortcuts">
-      <h3>Keyboard shortcuts</h3>
-      <p className="small">1–9 switch pages. On Draft: / to search, Enter to add, Tab to switch teams, B to ban, Backspace to undo. On Live: R Roshan killed, T Tormentor killed, A Aegis taken. ? shows this.</p>
+    <div className="panel kbd-help" role="dialog" aria-label="Горячие клавиши">
+      <h3>Горячие клавиши</h3>
+      <p className="small">1–9 переключают страницы. В драфте: / поиск, Enter добавить, Tab сменить команду, B бан, Backspace отменить. На странице «Матч»: R Рошан убит, T Tormentor убит, A Аегис взят. ? показывает эту подсказку.</p>
       <button className="btn" type="button" onClick={onClose}>
-        Close
+        Закрыть
       </button>
     </div>
   );
@@ -62,10 +62,10 @@ export function App() {
   const conn = live.snap?.connection;
   return (
     <div className="shell">
-      <nav className="nav" aria-label="Main">
+      <nav className="nav" aria-label="Главное меню">
         <div className="brand">
           d2bg
-          <small>Dota 2 companion, patch {version?.patch ?? "…"}</small>
+          <small>Помощник для Dota 2, патч {version?.patch ?? "…"}</small>
         </div>
         {NAV.map((n) => (
           <NavLink key={n.to} to={n.to} end={n.to === "/"} className={({ isActive }) => (isActive ? "active" : undefined)}>
@@ -75,7 +75,7 @@ export function App() {
         ))}
         <div className="status" aria-live="polite">
           <span className={`dot ${conn?.connected ? "on" : live.online ? "" : "off"}`} />
-          {!live.online ? "App server offline" : conn?.connected ? (conn.source === "game" ? "Receiving game data" : `Playing ${conn.source}`) : "Waiting for Dota"}
+          {!live.online ? "Сервер приложения недоступен" : conn?.connected ? (conn.source === "game" ? "Получаем данные игры" : conn.source === "demo" ? "Идёт демо-матч" : conn.source === "replay" ? "Воспроизводим запись" : `Источник: ${conn.source}`) : "Ждём Dota"}
         </div>
       </nav>
       <main className="main">
@@ -92,7 +92,7 @@ export function App() {
           <Route path="/match/:id" element={<MatchPage />} />
           <Route path="/setup" element={<SetupPage live={live.snap} />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<p>Nothing here. Pick a page on the left.</p>} />
+          <Route path="*" element={<p>Здесь ничего нет. Выберите страницу слева.</p>} />
         </Routes>
       </main>
       {help && <Shortcuts onClose={() => setHelp(false)} />}

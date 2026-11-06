@@ -128,19 +128,19 @@ def review(ctx: AppContext, match: Mapping[str, Any], account_id: int | None) ->
         for b in benchmarks:
             if b["percentile"] <= 0.25:
                 notes.append(
-                    f"{b['label']} was at the {round(b['percentile'] * 100)}th percentile for "
+                    f"{b['label']}: {round(b['percentile'] * 100)}-й процентиль для "
                     f"{my_row['hero_name']} ({b['value']})."
                 )
             elif b["percentile"] >= 0.8:
                 notes.append(
-                    f"{b['label']} was in the top {100 - round(b['percentile'] * 100)}% "
-                    f"for {my_row['hero_name']} ({b['value']})."
+                    f"{b['label']}: топ-{100 - round(b['percentile'] * 100)}% "
+                    f"для {my_row['hero_name']} ({b['value']})."
                 )
         late = [t for t in timings if t["delta_seconds"] >= 180]
         if late:
             worst = max(late, key=lambda t: t["delta_seconds"])
             notes.append(
-                f"{worst['name']} came at {worst['you']}, {worst['delta']} after the pro median "
+                f"{worst['name']}: покупка в {worst['you']}, на {worst['delta']} позже медианы про-игроков "
                 f"({worst['pro_median']})."
             )
         if my_row["lh_10"] is not None:
@@ -150,7 +150,7 @@ def review(ctx: AppContext, match: Mapping[str, Any], account_id: int | None) ->
             lhpm = value_at(0.5, bench.get("last_hits_per_min", []))
             if lhpm:
                 notes.append(
-                    f"Last hits at 10:00: {my_row['lh_10']} (hero median pace about {round(lhpm * 10)})."
+                    f"Ластхиты к 10:00: {my_row['lh_10']} (медиана для героя — около {round(lhpm * 10)})."
                 )
     radiant = [r for r in rows if r["radiant"]]
     dire = [r for r in rows if not r["radiant"]]

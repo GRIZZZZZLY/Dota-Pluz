@@ -37,7 +37,7 @@ def test_health_version_and_ui_placeholder(client):
     v = client.get("/api/version").json()
     assert v["patch"].startswith("7.") and v["timer_patch"].startswith("7.41")
     page = client.get("/draft")
-    assert page.status_code == 200 and "not built" in page.text
+    assert page.status_code == 200 and "ещё не собран" in page.text
     assert client.get("/api/nope").status_code == 404
 
 
@@ -141,7 +141,7 @@ def test_heroes_items_meta_build(client):
     assert client.get("/api/heroes/zzzz").status_code == 404
     b = client.get("/api/heroes/lion/build").json()
     assert b["hero"]["name"] == "Lion" and "skills" in b and "items" in b
-    assert client.get("/api/heroes/lion/build.txt").text.startswith("Lion build")
+    assert client.get("/api/heroes/lion/build.txt").text.startswith("Lion — сборка")
     items = client.get("/api/items").json()
     assert any(i["key"] == "black_king_bar" for i in items)
     bkb = client.get("/api/items/black_king_bar").json()
@@ -245,7 +245,7 @@ def test_profile_endpoints(live_client, ctx):
         return_value=httpx.Response(200, json=[{"account_id": 9, "personaname": "x"}])
     )
     p = live_client.get("/api/profile", params={"account_id": 77}).json()
-    assert p["name"] == "Taj" and p["rank"] == "Legend 3"
+    assert p["name"] == "Taj" and p["rank"] == "Легенда 3"
     assert p["summary"]["games"] == 40 and p["hero_pool"][0]["games"] >= 13
     assert p["sessions"] and p["streaks"]["current"] >= 1
     assert live_client.get("/api/profile/peers", params={"account_id": 77}).json()[0]["with_win_rate"] == 0.6
@@ -290,7 +290,7 @@ def test_match_review_endpoint(live_client, ctx):
     respx.post(f"{BASE}/request/1").mock(return_value=httpx.Response(200, json={"job": {"jobId": 5}}))
     r = live_client.get("/api/matches/1", params={"account_id": 77}).json()
     assert r["parsed"] and r["me"]["won"] and r["me"]["row"]["items"][0]["name"] == "Black King Bar"
-    assert any("top 10%" in n for n in r["notes"]) and any("20th percentile" in n for n in r["notes"])
+    assert any("топ-10%" in n for n in r["notes"]) and any("20-й процентиль" in n for n in r["notes"])
     assert r["me"]["row"]["lh_10"] == 100
     assert len(r["radiant"]) == 2 and len(r["dire"]) == 2
     assert live_client.get("/api/matches/2").status_code == 404

@@ -20,6 +20,12 @@ BASELINE_VERSION = "baseline-0.2"
 # Phases in which advice can still be acted on.
 ADVICE_PHASES = frozenset({"strategy", "showcase", "pre_game", "in_game"})
 BUYBACK_FROM_S = 30 * 60  # the engine's buyback guard starts here too
+# Why a skill rank cannot be learned (``skills.blocked``), as the status page shows it.
+BLOCKED_RU = {
+    "unknown": "число рангов способности неизвестно",
+    "max": "способность уже на максимуме",
+    "level": "не хватает уровня героя",
+}
 
 
 def context_hash(c: GameContext) -> str:
@@ -44,7 +50,7 @@ def recommendations(c: GameContext, snap: dict[str, Any], app: AppContext) -> li
         return []
     pro = app.data.per_hero("pro_builds.json", c.hero_id) or {}
     small = (
-        f" Мало pro-игр на герое ({pro.get('n', 0)}), совет ориентировочный."
+        f" Мало про-матчей на герое ({pro.get('n', 0)}), совет ориентировочный."
         if pro.get("n", 0) < MIN_ROWS
         else ""
     )
@@ -63,7 +69,7 @@ def recommendations(c: GameContext, snap: dict[str, Any], app: AppContext) -> li
                 first["item"],
                 category="core",
                 alternatives=[i["item"] for i in items[1:]],
-                reason_ru=f"Следующий основной предмет по pro-сборке героя.{small}",
+                reason_ru=f"Следующий основной предмет по сборке про-игроков.{small}",
                 evidence=[f"build:{c.hero_key}", *(f"inventory:{k}" for k in sorted(set(c.owned) & parts))],
             )
         )
@@ -95,8 +101,8 @@ def recommendations(c: GameContext, snap: dict[str, Any], app: AppContext) -> li
                 "SKILL_LEVEL",
                 nxt["ability"],
                 reason_ru=(
-                    f"{nxt['name']}, уровень {nxt['rank']}: профессионалы на этом шаге чаще всего берут его "
-                    f"({nxt['share']:.0%} из {nxt.get('n') or '?'} игр).{small}"
+                    f"{nxt['name']}, уровень {nxt['rank']}: про-игроки на этом шаге чаще всего берут его "
+                    f"({nxt['share']:.0%}, про-матчей: {nxt.get('n') or '?'}).{small}"
                 ),
                 confidence=nxt["share"],
                 confidence_kind="pro_pick_share",
@@ -124,8 +130,8 @@ def recommendations(c: GameContext, snap: dict[str, Any], app: AppContext) -> li
                 talent["talent"],
                 alternatives=[talent["alternative"]],
                 reason_ru=(
-                    f"Талант {talent['level']} уровня: профессионалы чаще берут «{names[talent['talent']]}» "
-                    f"({talent['share']:.0%} из {talent['n']} игр), а не «{names[talent['alternative']]}»."
+                    f"Талант {talent['level']} уровня: про-игроки чаще берут «{names[talent['talent']]}» "
+                    f"({talent['share']:.0%}, про-матчей: {talent['n']}), а не «{names[talent['alternative']]}»."
                     + (" Выборка маленькая." if talent["n"] < MIN_ROWS else "")
                 ),
                 confidence=talent["share"],
@@ -208,32 +214,32 @@ def rejection(rec: Recommendation, c: GameContext, app: AppContext) -> str | Non
     This is the last check for every source: the baseline, and later Jev, Groq or a hybrid.
     """
     if rec.match_id != c.match_id:
-        return "another match"
+        return "другой матч"
     if not set(rec.evidence_ids) <= set(c.evidence_ids):
-        return "cites facts that are not in the context"
+        return "ссылается на факты, которых нет в контексте"
     if rec.type == "SKILL_LEVEL":
         rank = c.learned_skills.get(rec.candidate_id)
         if rank is None:
-            return "not one of his abilities"
+            return "это не его способность"
         if (c.available_skill_points or 0) <= 0:
-            return "no skill point"
+            return "нет свободного очка способностей"
         ability = app.data.load("abilities.json").get(rec.candidate_id)
         why = blocked(rank, c.level or 0, rec.candidate_id in c.ultimates, data_ranks(ability))
-        return None if why is None else f"cannot level: {why}"
+        return None if why is None else f"нельзя прокачать: {BLOCKED_RU.get(why, why)}"
     if rec.type == "TALENT":
         hero = app.data.heroes.get(c.hero_id) if c.hero_id else None
         tier = next((t.level for t in hero.talents if t.key == rec.candidate_id), None) if hero else None
         if tier is None or len(c.talents) != 8:
-            return "unknown talent"
+            return "неизвестный талант"
         if (c.level or 0) < TALENT_LEVELS[tier]:
-            return "tier not open"
-        return "tier already taken" if c.talents[2 * tier - 2] or c.talents[2 * tier - 1] else None
+            return "уровень таланта ещё не открыт"
+        return "талант этого уровня уже взят" if c.talents[2 * tier - 2] or c.talents[2 * tier - 1] else None
     if rec.type in ("ITEM_NEXT", "ITEM_SITUATIONAL"):
         if app.data.items.get(rec.candidate_id) is None:
-            return "unknown item"
-        return "already owned" if rec.candidate_id in c.owned else None
+            return "неизвестный предмет"
+        return "предмет уже есть" if rec.candidate_id in c.owned else None
     if rec.type == "ITEM_BUYBACK_GUARD":
         if c.time_s is None or c.time_s < BUYBACK_FROM_S:
-            return "too early for a buyback guard"
-        return None if c.gold is not None and c.buyback_cost else "no gold or buyback data"
-    return f"{rec.type} is not produced by the baseline"
+            return "для предупреждения о выкупе ещё рано"
+        return None if c.gold is not None and c.buyback_cost else "нет данных о золоте или выкупе"
+    return f"{rec.type}: такой совет офлайн-правила не дают"

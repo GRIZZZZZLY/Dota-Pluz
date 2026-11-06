@@ -24,7 +24,7 @@ Svc = Annotated[Services, Depends(services)]
 def _hero(svc: Services, ref: str) -> Hero:
     hero = svc.ctx.data.heroes.get(ref) or next(iter(svc.ctx.data.heroes.search(ref, 1)), None)
     if hero is None:
-        raise HTTPException(404, f"No hero matches {ref!r}")
+        raise HTTPException(404, f"Не найден герой по запросу {ref!r}")
     return hero
 
 
@@ -137,7 +137,7 @@ def item_detail(svc: Svc, key: str) -> dict[str, Any]:
     items = svc.ctx.data.items
     item = items.get(key)
     if item is None:
-        raise HTTPException(404, f"No item {key!r}")
+        raise HTTPException(404, f"Нет предмета {key!r}")
     buyers = []
     pro = svc.ctx.data.load("pro_builds.json") or {"heroes": {}}
     for hero_id, doc in pro["heroes"].items():
@@ -230,7 +230,7 @@ def draft(svc: Svc, body: DraftRequest) -> dict[str, Any]:
         if svc.ctx.data.heroes.get(h) is None
     ]
     if unknown:
-        raise HTTPException(422, f"Unknown hero IDs: {unknown}")
+        raise HTTPException(422, f"Неизвестные id героев: {unknown}")
     return analyze(svc.ctx, body, svc.ctx.settings.get())
 
 

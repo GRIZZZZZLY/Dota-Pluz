@@ -9,14 +9,14 @@ from datetime import datetime
 from typing import Any
 
 MEDALS = {
-    1: "Herald",
-    2: "Guardian",
-    3: "Crusader",
-    4: "Archon",
-    5: "Legend",
-    6: "Ancient",
-    7: "Divine",
-    8: "Immortal",
+    1: "Рекрут",
+    2: "Страж",
+    3: "Рыцарь",
+    4: "Герой",
+    5: "Легенда",
+    6: "Властелин",
+    7: "Божество",
+    8: "Титан",
 }
 SESSION_GAP = 2 * 3600
 
@@ -29,9 +29,9 @@ def rank_name(rank_tier: int | None, leaderboard: int | None = None) -> str | No
     if not rank_tier:
         return None
     medal, stars = divmod(int(rank_tier), 10)
-    name = MEDALS.get(medal, "Unknown")
+    name = MEDALS.get(medal, "Неизвестно")
     if medal == 8:
-        return f"Immortal #{leaderboard}" if leaderboard else "Immortal"
+        return f"Титан #{leaderboard}" if leaderboard else "Титан"
     return f"{name} {stars}" if stars else name
 
 

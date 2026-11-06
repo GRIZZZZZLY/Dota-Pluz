@@ -27,14 +27,14 @@ export function ClockRail({ timers, now }: { timers: TimerView[]; now: number })
   return (
     <div>
       <div className="rail-wrap">
-        <div className="rail" style={{ height: HEIGHT }} aria-label="Upcoming timers">
+        <div className="rail" style={{ height: HEIGHT }} aria-label="Ближайшие таймеры">
           {ticks.map((s) => (
             <div key={s} className="tick" style={{ top: (s / SPAN) * HEIGHT }}>
-              <span>{s === 0 ? "now" : `+${s / 60}m`}</span>
+              <span>{s === 0 ? "сейчас" : `+${s / 60} мин`}</span>
             </div>
           ))}
           {rosh && rosh.at !== null && (
-            <div className="window" style={{ top: 0, height: y(rosh.at) }} title="Roshan may be alive" />
+            <div className="window" style={{ top: 0, height: y(rosh.at) }} title="Рошан, возможно, уже жив" />
           )}
           {placed.map(({ t, top }) => (
             <div key={t.id} className={`event${(t.seconds_left ?? 99) <= t.lead ? " soon" : ""}`} style={{ top }} title={t.cite}>

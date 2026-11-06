@@ -23,13 +23,15 @@ Svc = Annotated[Services, Depends(services)]
 def _account(svc: Services, account_id: int | None) -> int:
     acc = account_id or svc.ctx.settings.get().account_id
     if not acc:
-        raise HTTPException(400, "No account ID yet. Enter it in Settings, or play one game with GSI on.")
+        raise HTTPException(
+            400, "Account ID ещё не задан. Укажите его в настройках или сыграйте одну игру с включённым GSI."
+        )
     return acc
 
 
 def _upstream(exc: OpenDotaError) -> HTTPException:
     if isinstance(exc, NotFoundError):
-        return HTTPException(404, "OpenDota has no data for this yet")
+        return HTTPException(404, "На OpenDota пока нет этих данных")
     return HTTPException(502, f"OpenDota: {exc}")
 
 
@@ -66,7 +68,7 @@ def match(svc: Svc, match_id: int, account_id: int | None = None) -> dict[str, A
     except OpenDotaError as exc:
         raise _upstream(exc) from exc
     if not isinstance(doc, dict) or not doc.get("players"):
-        raise HTTPException(404, "OpenDota has no data for this match yet")
+        raise HTTPException(404, "На OpenDota пока нет данных об этом матче")
     return review(svc.ctx, doc, account_id or svc.ctx.settings.get().account_id)
 
 
@@ -139,10 +141,10 @@ def data_refresh(svc: Svc, body: RefreshBody) -> dict[str, Any]:
     steps = body.steps or [s for s in STEPS if s != "draft_model"]
     bad = [s for s in steps if s not in STEPS]
     if bad:
-        raise HTTPException(422, f"unknown steps {bad}")
+        raise HTTPException(422, f"Неизвестные шаги: {bad}")
     with svc.lock:
         if svc.refresh.running:
-            raise HTTPException(409, "A refresh is already running")
+            raise HTTPException(409, "Обновление уже идёт")
         svc.refresh = RefreshJob(running=True, steps=steps)
     job = svc.refresh
 

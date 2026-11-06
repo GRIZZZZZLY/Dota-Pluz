@@ -20,6 +20,9 @@ dependencies = [
 window = ["pywebview>=5.3"]
 # Retraining the draft model. Inference needs none of this.
 train = ["numpy>=2.1", "scikit-learn>=1.5"]
+# Draft-screen recognition (d2bg-cv): a separate process that captures the screen only during the
+# draft, see src/d2bg_cv and docs/SAFETY.md.
+cv = ["mss>=9", "opencv-python-headless>=4.10", "numpy>=2.1"]
 dev = [
   "pytest>=8.3",
   "pytest-cov>=6",
@@ -28,17 +31,20 @@ dev = [
   "mypy>=1.13",
   "numpy>=2.1",
   "scikit-learn>=1.5",
+  "mss>=9",
+  "opencv-python-headless>=4.10",
 ]
 
 [project.scripts]
 d2bg = "d2bg.cli:app"
+d2bg-cv = "d2bg_cv.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/d2bg"]
+packages = ["src/d2bg", "src/d2bg_cv"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "data/snapshot" = "d2bg/_snapshot"
@@ -61,15 +67,25 @@ ignore = ["PLR0913", "PLR0917", "PLR2004", "S101", "S311", "E501", "PLR0912", "P
 "src/d2bg/pipeline/refresh.py" = ["S608"]
 # Copilot advice is written in Russian; Cyrillic letters are intended, not look-alikes.
 "src/d2bg/copilot/**" = ["RUF001"]
+"src/d2bg_cv/cli.py" = ["RUF001"]
+"tests/d2bg/test_cv.py" = ["RUF001"]
 "tests/d2bg/test_copilot.py" = ["RUF001"]
+# The interface is in Russian: texts sent to the UI are Cyrillic on purpose.
+"src/d2bg/api/**" = ["RUF001"]
+"src/d2bg/builds/guide.py" = ["RUF001"]
+"src/d2bg/draft/composition.py" = ["RUF001"]
+"src/d2bg/knowledge/timers.py" = ["RUF001"]
+"src/d2bg/knowledge/traits.py" = ["RUF001"]
+"src/d2bg/live/engine.py" = ["RUF001"]
+"tests/d2bg/test_copilot_baseline.py" = ["RUF001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["d2bg"]
+known-first-party = ["d2bg", "d2bg_cv"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src/d2bg"]
+files = ["src/d2bg", "src/d2bg_cv"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
@@ -82,5 +98,5 @@ addopts = "-q"
 markers = ["slow: trains models or builds the full snapshot"]
 
 [tool.coverage.run]
-source = ["d2bg"]
+source = ["d2bg", "d2bg_cv"]
 omit = ["src/d2bg/window.py"]

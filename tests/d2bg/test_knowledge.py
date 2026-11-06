@@ -98,7 +98,7 @@ def test_traits_have_evidence_and_overrides_apply(shared_ctx):
     storm = shared_ctx.data.heroes.require("storm_spirit")
     assert Trait.ILLUSIONS not in shared_ctx.traits.of(storm.id)
     invoker = shared_ctx.data.heroes.require("invoker")
-    assert shared_ctx.traits.of(invoker.id)[Trait.INVISIBILITY] == ["reviewed"]
+    assert shared_ctx.traits.of(invoker.id)[Trait.INVISIBILITY] == ["проверено вручную"]
     for view in shared_ctx.traits.view(shared_ctx.data.heroes.require("lion").id):
         assert view["evidence"] and view["label"]
 

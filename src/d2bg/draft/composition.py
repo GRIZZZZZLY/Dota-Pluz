@@ -33,27 +33,27 @@ def team_report(
     warnings: list[str] = []
     n = len(heroes)
     if n >= 3 and not hard_disable:
-        warnings.append("No stun or hex")
+        warnings.append("Нет оглушений и превращений")
     if n >= 3 and roles["Initiator"] == 0:
-        warnings.append("No listed initiator")
+        warnings.append("Нет инициатора")
     if n >= 4 and roles["Durable"] == 0:
-        warnings.append("No durable frontline")
+        warnings.append("Нет крепкого героя для первой линии")
     if n >= 4 and magic == 0:
-        warnings.append("Almost no magic damage: enemies can stack armor")
+        warnings.append("Почти нет магического урона: враги могут набрать броню")
     if n >= 4 and physical == 0:
-        warnings.append("No right-click damage dealer")
+        warnings.append("Нет героя с сильной автоатакой")
     if n >= 4 and attack["Melee"] >= 4:
-        warnings.append(f"{attack['Melee']} melee heroes")
+        warnings.append(f"Героев ближнего боя: {attack['Melee']}")
     if n >= 4 and roles["Pusher"] == 0:
-        warnings.append("Little tower pushing")
+        warnings.append("Слабый пуш башен")
     if n == 5 and roles["Support"] < 2:
-        warnings.append("Fewer than two supports")
+        warnings.append("Меньше двух саппортов")
     covered: list[int] = []
     if positions is not None and heroes:
         ids = [str(h.id) for h in heroes]
         roles_map = {str(h.id): positions.get(h.id, set()) for h in heroes}
         if n == 5 and _max_role_assignment(ids, roles_map) < 5:
-            warnings.append("No way to fill all five positions with these heroes")
+            warnings.append("Эти герои не закрывают все пять позиций")
         covered = sorted({p for h in heroes for p in positions.get(h.id, set())})
     return {
         "heroes": [h.id for h in heroes],

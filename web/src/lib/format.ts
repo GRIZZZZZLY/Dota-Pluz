@@ -20,44 +20,43 @@ export function pts(value: number, digits = 1): string {
 
 export function gold(value: number | null | undefined): string {
   if (value === null || value === undefined) return "–";
-  return value.toLocaleString("en-US");
+  return value.toLocaleString("ru-RU");
 }
 
+/** Russian masculine ordinal: 62 -> "62-й" (agrees with «перцентиль»). */
 export function ordinal(n: number): string {
-  const rem100 = n % 100;
-  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
-  return `${n}${({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th"}`;
+  return `${n}-й`;
 }
 
 export function percentileText(p: number | null | undefined): string {
   if (p === null || p === undefined) return "–";
-  return `${ordinal(Math.round(p * 100))} percentile`;
+  return `${ordinal(Math.round(p * 100))} перцентиль`;
 }
 
 export function date(ts: number | null | undefined): string {
   if (!ts) return "–";
-  return new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return new Date(ts * 1000).toLocaleDateString("ru-RU", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function dateTime(ts: number | null | undefined): string {
   if (!ts) return "–";
-  return new Date(ts * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(ts * 1000).toLocaleString("ru-RU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export const POSITION_NAMES: Record<number, string> = {
-  1: "Safe lane carry",
-  2: "Mid",
-  3: "Off lane",
-  4: "Soft support",
-  5: "Hard support",
+  1: "Керри",
+  2: "Мид",
+  3: "Оффлейн",
+  4: "Саппорт",
+  5: "Полный саппорт",
 };
 
 export const BUCKETS = [
-  { value: "all", label: "All ranks" },
-  { value: "1-2", label: "Herald–Guardian" },
-  { value: "3-4", label: "Crusader–Archon" },
-  { value: "5-6", label: "Legend–Ancient" },
-  { value: "7-8", label: "Divine–Immortal" },
+  { value: "all", label: "Все ранги" },
+  { value: "1-2", label: "Рекрут–Страж" },
+  { value: "3-4", label: "Рыцарь–Герой" },
+  { value: "5-6", label: "Легенда–Властелин" },
+  { value: "7-8", label: "Божество–Титан" },
 ] as const;
 
-export const MEDALS = ["Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
+export const MEDALS = ["Рекрут", "Страж", "Рыцарь", "Герой", "Легенда", "Властелин", "Божество", "Титан"];

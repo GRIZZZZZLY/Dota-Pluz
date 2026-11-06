@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import { useDraft, useHeroes, useSettings } from "../api/hooks";
+import { useCopilotStatus, useDraft, useHeroes, useSettings } from "../api/hooks";
 import type { DraftRequest, DraftResponse, HeroListRow, LiveSnapshot, RankBucket, Side, Suggestion, TeamReport } from "../api/types";
 import { ErrorBox, HeroChip, ItemIcon, Portrait, Segmented, WinSplit, useHeroMap } from "../components/common";
 import { HeroPicker } from "../components/HeroPicker";
@@ -35,26 +35,26 @@ function Slots({ heroes, side, ours, positions, selected, onSelect, onRemove }: 
 }) {
   const heroMap = useHeroMap();
   return (
-    <section className={`team ${side}${selected ? " selected" : ""}`} aria-label={`${side} picks`}>
+    <section className={`team ${side}${selected ? " selected" : ""}`} aria-label={side === "radiant" ? "Пики Света" : "Пики Тьмы"}>
       <header>
-        <h2 className={side}>{side === "radiant" ? "Radiant" : "Dire"}</h2>
+        <h2 className={side}>{side === "radiant" ? "Свет" : "Тьма"}</h2>
         <button type="button" className="btn small" onClick={onSelect} aria-pressed={selected}>
-          {ours ? "Your team" : "Enemy team"}
-          {selected ? ", adding here" : ""}
+          {ours ? "Ваша команда" : "Вражеская команда"}
+          {selected ? ", добавляем сюда" : ""}
         </button>
       </header>
       <div className="slots">
         {Array.from({ length: 5 }, (_, i) => {
           const h = heroes[i];
           return h ? (
-            <button key={h} type="button" className="slot filled" onClick={() => onRemove(h)} title="Remove">
+            <button key={h} type="button" className="slot filled" onClick={() => onRemove(h)} title="Убрать">
               <Portrait hero={h} size={40} wide />
               <span>{heroMap.get(h)?.name}</span>
-              {positions?.[String(h)] ? <span className="pos">pos {positions[String(h)]}</span> : null}
+              {positions?.[String(h)] ? <span className="pos">поз. {positions[String(h)]}</span> : null}
             </button>
           ) : (
             <button key={`empty${i}`} type="button" className="slot" onClick={onSelect}>
-              <span className="muted small">{selected && i === heroes.length ? "Next pick goes here" : "Empty"}</span>
+              <span className="muted small">{selected && i === heroes.length ? "Следующий пик сюда" : "Пусто"}</span>
             </button>
           );
         })}
@@ -66,24 +66,24 @@ function Slots({ heroes, side, ours, positions, selected, onSelect, onRemove }: 
 function Why({ s }: { s: Suggestion }) {
   const heroMap = useHeroMap();
   const parts = [
-    ...s.why.good_against.map((g) => `beats ${heroMap.get(g.hero)?.name ?? g.hero} ${pts(g.value)}`),
-    ...s.why.with.map((g) => `with ${heroMap.get(g.hero)?.name ?? g.hero} ${pts(g.value)}`),
-    ...s.why.bad_against.slice(0, 1).map((g) => `weak to ${heroMap.get(g.hero)?.name ?? g.hero} ${pts(g.value)}`),
+    ...s.why.good_against.map((g) => `сильнее ${heroMap.get(g.hero)?.name ?? g.hero} ${pts(g.value)}`),
+    ...s.why.with.map((g) => `вместе с ${heroMap.get(g.hero)?.name ?? g.hero} ${pts(g.value)}`),
+    ...s.why.bad_against.slice(0, 1).map((g) => `слаб против ${heroMap.get(g.hero)?.name ?? g.hero} ${pts(g.value)}`),
   ];
-  return <>{parts.join(", ") || "No matchup data against these picks yet"}</>;
+  return <>{parts.join(", ") || "Пока нет данных о матчапах против этих пиков"}</>;
 }
 
 function SuggestionTable({ rows, onCompare, compare }: { rows: Suggestion[]; onCompare: (h: number) => void; compare: number[] }) {
-  if (!rows.length) return <p className="muted">Nothing fits these filters.</p>;
+  if (!rows.length) return <p className="muted">Под эти фильтры ничего не подходит.</p>;
   return (
     <table className="suggest">
       <thead>
         <tr>
-          <th>Hero</th>
-          <th className="num">Score</th>
-          <th>Positions</th>
-          <th>Why</th>
-          <th className="num" title="How hard its best counters beat it. Higher means pick it later.">Counter risk</th>
+          <th>Герой</th>
+          <th className="num">Оценка</th>
+          <th>Позиции</th>
+          <th>Почему</th>
+          <th className="num" title="Насколько сильно героя бьют его лучшие контрпики. Чем выше, тем позже его стоит брать.">Риск контрпика</th>
           <th />
         </tr>
       </thead>
@@ -101,7 +101,7 @@ function SuggestionTable({ rows, onCompare, compare }: { rows: Suggestion[]; onC
             <td className="num small">{s.counterability.toFixed(1)}</td>
             <td>
               <button type="button" className="btn small" disabled={compare.includes(s.hero) || compare.length >= 3} onClick={() => onCompare(s.hero)}>
-                Compare
+                Сравнить
               </button>
             </td>
           </tr>
@@ -125,11 +125,11 @@ function TeamPanel({ title, report }: { title: string; report: TeamReport }) {
           ))}
         </ul>
       ) : (
-        <p className="small good">No gaps found.</p>
+        <p className="small good">Слабых мест не найдено.</p>
       )}
       <p className="small muted">
-        Damage: {report.damage.magic} magic, {report.damage.physical} physical, {report.damage.pure} pure. {report.melee} melee,{" "}
-        {report.ranged} ranged. Disables from {report.disablers.length ? report.disablers.join(", ") : "nobody"}.
+        Урон: магический {report.damage.magic}, физический {report.damage.physical}, чистый {report.damage.pure}. Ближний бой:{" "}
+        {report.melee}, дальний: {report.ranged}. Контроль: {report.disablers.length ? report.disablers.join(", ") : "ни у кого"}.
       </p>
       <div className="row">
         {Object.entries(report.traits).map(([key, t]) => (
@@ -158,13 +158,13 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
       {res.win && (
         <section className="panel win-meter">
           <div className="labels">
-            <span className={usLeft ? "radiant" : "dire"}>{usLeft ? `You ${pct(res.win.us)}` : `Them ${pct(res.win.them)}`}</span>
-            <span className={usLeft ? "dire" : "radiant"}>{usLeft ? `Them ${pct(res.win.them)}` : `You ${pct(res.win.us)}`}</span>
+            <span className={usLeft ? "radiant" : "dire"}>{usLeft ? `Мы ${pct(res.win.us)}` : `Они ${pct(res.win.them)}`}</span>
+            <span className={usLeft ? "dire" : "radiant"}>{usLeft ? `Они ${pct(res.win.them)}` : `Мы ${pct(res.win.us)}`}</span>
           </div>
-          <WinSplit left={usLeft ? res.win.us : res.win.them} label="Win probability" />
+          <WinSplit left={usLeft ? res.win.us : res.win.them} label="Оценка шанса на победу" />
           <p className="source">
-            Draft-only model; on held-out matches it picked the winner {pct(res.win.held_out_accuracy)} of the time. Skill and
-            execution decide far more than this number.
+            Оценка модели только по драфту: на проверочных матчах она угадывала победителя в {pct(res.win.held_out_accuracy)} случаев.
+            Умение и исполнение решают куда больше, чем это число.
           </p>
         </section>
       )}
@@ -174,37 +174,37 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
         </div>
       ))}
       <section className="panel">
-        <h2>Picks for you</h2>
+        <h2>Пики для вас</h2>
           <div className="tabs" role="tablist">
             {["all", "1", "2", "3", "4", "5"].map((t) => (
               <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} title={t === "all" ? "" : POSITION_NAMES[Number(t)]}>
-                {t === "all" ? "Any position" : `Pos ${t}`}
+                {t === "all" ? "Любая позиция" : `Поз. ${t}`}
               </button>
             ))}
           </div>
           <SuggestionTable rows={rows} onCompare={onCompare} compare={compare} />
           <p className="source">
-            Score = average win-rate edge over their picks plus your synergy weight times the edge with your picks, in percentage
-            points. {res.sample_matches.toLocaleString()} ranked matches, {res.source_week}, {BUCKETS.find((b) => b.value === res.bucket)?.label}.
+            Оценка = средний перевес по винрейту против их пиков плюс вес синергии, умноженный на перевес с вашими пиками, в процентных
+            пунктах. Рейтинговых матчей: {res.sample_matches.toLocaleString("ru-RU")}, {res.source_week}, {BUCKETS.find((b) => b.value === res.bucket)?.label}.
           </p>
       </section>
       <div className="grid cols-2">
         <section className="panel">
-          <h2>Bans</h2>
+          <h2>Баны</h2>
           <ul className="small" style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {res.bans.slice(0, 8).map((b) => (
               <li key={b.hero} className="row" style={{ justifyContent: "space-between", padding: "0.2rem 0" }}>
                 <HeroChip hero={b.hero} size={24} />
                 <span className="muted">
-                  {b.beats.length ? `beats ${b.beats.map((x) => heroMap.get(x.hero)?.name).join(", ")}, ` : ""}
-                  {pct(b.wr)} win rate
+                  {b.beats.length ? `сильнее ${b.beats.map((x) => heroMap.get(x.hero)?.name).join(", ")}, ` : ""}
+                  винрейт {pct(b.wr)}
                 </span>
               </li>
             ))}
           </ul>
           {res.hot_counters.length > 0 && (
             <>
-              <h3 style={{ marginTop: "1rem" }}>Counter two or more of their heroes</h3>
+              <h3 style={{ marginTop: "1rem" }}>Контрпики к двум и более их героям</h3>
               <div className="row">
                 {res.hot_counters.slice(0, 8).map((h) => (
                   <HeroChip key={h.hero} hero={h.hero} size={24} extra={<span className="muted small">×{h.enemies.length}</span>} />
@@ -215,13 +215,13 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
         </section>
         {Object.keys(res.counters).length > 0 && (
           <section className="panel">
-            <h2>What beats each enemy</h2>
+            <h2>Контрпики к каждому врагу</h2>
             {Object.entries(res.counters).map(([enemy, list]) => (
               <div key={enemy} style={{ marginBottom: "0.6rem" }}>
                 <HeroChip hero={Number(enemy)} size={26} />
                 <div className="row small" style={{ marginTop: "0.3rem" }}>
                   {list.slice(0, 5).map((c) => (
-                    <span key={c.hero} className="tag" title={`${pts(c.edge)} points`}>
+                    <span key={c.hero} className="tag" title={`${pts(c.edge)} п. п.`}>
                       {heroMap.get(c.hero)?.name}
                     </span>
                   ))}
@@ -233,14 +233,14 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
       </div>
       {compare.length > 0 && (
         <section className="panel">
-          <h2>Side by side</h2>
+          <h2>Сравнение</h2>
           <table>
             <thead>
               <tr>
-                <th>Hero</th>
-                <th className="num">Score</th>
-                <th>Why</th>
-                <th className="num">Counter risk</th>
+                <th>Герой</th>
+                <th className="num">Оценка</th>
+                <th>Почему</th>
+                <th className="num">Риск контрпика</th>
                 <th />
               </tr>
             </thead>
@@ -257,7 +257,7 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
                   <td className="num">{s.counterability.toFixed(1)}</td>
                   <td>
                     <button type="button" className="btn small" onClick={() => removeCompare(s.hero)}>
-                      Remove
+                      Убрать
                     </button>
                   </td>
                 </tr>
@@ -268,30 +268,30 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
       )}
       <div className="grid cols-2">
         <section className="panel">
-          <TeamPanel title="Your team" report={res.ours} />
+          <TeamPanel title="Ваша команда" report={res.ours} />
           <div style={{ height: "1rem" }} />
-          <TeamPanel title="Their team" report={res.theirs} />
-          {!res.ours.heroes.length && !res.theirs.heroes.length && <p className="muted">Pick heroes to see team gaps.</p>}
+          <TeamPanel title="Их команда" report={res.theirs} />
+          {!res.ours.heroes.length && !res.theirs.heroes.length && <p className="muted">Выберите героев, чтобы увидеть слабые места команд.</p>}
         </section>
         <section className="panel">
-          <h2>Lanes</h2>
+          <h2>Линии</h2>
           {res.lanes.length ? (
             <table>
               <thead>
                 <tr>
-                  <th>Your lane</th>
-                  <th>You</th>
-                  <th>Them</th>
-                  <th className="num">Edge</th>
+                  <th>Ваша линия</th>
+                  <th>Мы</th>
+                  <th>Они</th>
+                  <th className="num">Перевес</th>
                 </tr>
               </thead>
               <tbody>
                 {res.lanes.map((l) => (
                   <tr key={l.lane}>
-                    <td>{l.lane === "safe" ? "Safe lane" : l.lane === "mid" ? "Mid" : "Off lane"}</td>
+                    <td>{l.lane === "safe" ? "Лёгкая линия" : l.lane === "mid" ? "Мид" : "Сложная линия"}</td>
                     <td className="small">{l.ours.map((h) => heroMap.get(h)?.name).join(", ") || "–"}</td>
                     <td className="small">{l.theirs.map((h) => heroMap.get(h)?.name).join(", ") || "–"}</td>
-                    <td className={`num ${l.advantage >= 0 ? "good" : "bad"}`} title={`${l.pairs_known} of ${l.pairs_total} pairs have data`}>
+                    <td className={`num ${l.advantage >= 0 ? "good" : "bad"}`} title={`Данные есть для ${l.pairs_known} из ${l.pairs_total} пар`}>
                       {pts(l.advantage)}
                     </td>
                   </tr>
@@ -299,18 +299,18 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
               </tbody>
             </table>
           ) : (
-            <p className="muted">Add heroes to both teams to see lanes. Positions are guessed from pro games; the numbers are a rough guide.</p>
+            <p className="muted">Добавьте героев в обе команды, чтобы увидеть линии. Позиции угаданы по про-матчам, цифры примерные.</p>
           )}
         </section>
       </div>
       {res.items.length > 0 && (
         <section className="panel">
-          <h2>Items to plan for against their draft</h2>
+          <h2>Предметы против их драфта</h2>
           <div className="grid cols-2">
             {res.items.map((rule) => (
               <div key={rule.id}>
                 <p className="small" style={{ marginBottom: "0.3rem" }}>
-                  <strong>{rule.reason}</strong> <span className="muted">({rule.heroes.join(", ")})</span>
+                  <strong>{rule.reason_ru || rule.reason}</strong> <span className="muted">({rule.heroes.join(", ")})</span>
                 </p>
                 <div className="order">
                   {rule.items.map((i) => (
@@ -328,25 +328,37 @@ function Results({ res, state, onCompare, compare, removeCompare }: {
 
 /** Says what came from the game so far, and plainly what Dota does not send a player. */
 function GameStatus({ live }: { live: LiveSnapshot | null }) {
+  const { data: copilot } = useCopilotStatus();
   const draft = live?.draft;
   if (!live || !draft || !live.connection.connected) {
     return (
       <p className="note" style={{ marginBottom: "1rem" }}>
-        No game data right now. During a game your hero, your team and the bans fill in here by themselves. Dota does not send a
-        player the other picks during the draft, so type those in.
+        Сейчас данных из игры нет. Во время игры ваш герой, ваша команда и баны заполнятся здесь сами. Dota не передаёт игроку
+        остальные пики во время драфта, поэтому введите их вручную.
       </p>
     );
   }
   const found = Object.values(draft.sources ?? {});
   return (
-    <section className="panel" style={{ marginBottom: "1rem" }} aria-label="From the game">
+    <section className="panel" style={{ marginBottom: "1rem" }} aria-label="Из игры">
       <p className="small" style={{ margin: 0 }}>
         <span className="dot on" />
-        From the game{live.demo ? " (demo)" : ""}: {found.length ? found.join("; ") : "nothing yet; your hero appears once you pick"}.
+        Из игры{live.demo ? " (демо)" : ""}: {found.length ? found.join("; ") : "пока ничего; ваш герой появится, когда вы его выберете"}.
       </p>
       {draft.note && (
         <p className="small muted" style={{ margin: "0.4rem 0 0" }}>
           {draft.note}
+        </p>
+      )}
+      <p className="small muted" style={{ margin: "0.4rem 0 0" }}>
+        {copilot?.screen_reader?.running
+          ? "Чтение экрана драфта работает: пики врагов и союзников добавятся сами."
+          : "Чтение экрана драфта не запущено. Чтобы пики заполнялись сами, запустите run-cv.cmd в папке приложения."}
+      </p>
+      {!!draft.screen?.unknown && (
+        <p className="note" style={{ margin: "0.4rem 0 0" }}>
+          {"? ".repeat(draft.screen.unknown).trim()}: не распознано с экрана {draft.screen.unknown}. Добавьте этих героев вручную, приложение
+          не угадывает.
         </p>
       )}
     </section>
@@ -385,9 +397,24 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
     }
   }, [state]);
 
+  // During a match his board is the correction the Copilot uses: heroes he removed stop counting.
+  const liveMatch = live?.match_id ?? null;
+  useEffect(() => {
+    if (!state.edited || !state.matchId || state.matchId !== liveMatch) return;
+    const onBoard = new Set([...state.us, ...state.them, ...state.bans]);
+    // Only heroes this board saw from the game and he took off: a hero reported since is not removed.
+    const removed = (state.fromGame ?? []).filter((h) => !onBoard.has(h));
+    const timer = setTimeout(() => {
+      api
+        .post("/api/copilot/draft/manual", { match_id: state.matchId, allies: state.us, enemies: state.them, bans: state.bans, removed })
+        .catch(() => undefined); // the board still works without the Copilot
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [state.edited, state.matchId, state.us, state.them, state.bans, state.fromGame, liveMatch]);
+
   const update = (next: DraftState) => {
     setHistory((h) => [...h.slice(-30), state]);
-    setState(next);
+    setState({ ...next, edited: true });
   };
   const taken = useMemo(() => new Set([...state.us, ...state.them, ...state.bans]), [state]);
 
@@ -436,7 +463,7 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
 
   const copyText = () => {
     const name = (id: number) => heroes?.find((h) => h.id === id)?.name ?? String(id);
-    const text = `Us: ${state.us.map(name).join(", ")}\nThem: ${state.them.map(name).join(", ")}${state.bans.length ? `\nBans: ${state.bans.map(name).join(", ")}` : ""}`;
+    const text = `Мы: ${state.us.map(name).join(", ")}\nОни: ${state.them.map(name).join(", ")}${state.bans.length ? `\nБаны: ${state.bans.map(name).join(", ")}` : ""}`;
     void navigator.clipboard?.writeText(text);
   };
   const applyPaste = async () => {
@@ -445,7 +472,7 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
     if (target === "ban") update({ ...state, bans: [...state.bans, ...ids] });
     else if (target === "us") update({ ...state, us: [...state.us, ...ids].slice(0, 5) });
     else update({ ...state, them: [...state.them, ...ids].slice(0, 5) });
-    setPasteMsg(res.unknown.length ? `Not recognised: ${res.unknown.join(", ")}` : `Added ${ids.length}`);
+    setPasteMsg(res.unknown.length ? `Не распознано: ${res.unknown.join(", ")}` : `Добавлено: ${ids.length}`);
     setPaste("");
   };
 
@@ -455,23 +482,23 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
     <>
       <div className="page-head">
         <div>
-          <h1>Draft</h1>
-          <p>Your hero, your team and the bans fill in from the game by themselves. Type the other picks as they happen.</p>
+          <h1>Драфт</h1>
+          <p>Ваш герой, ваша команда и баны заполняются из игры сами. Остальные пики вводите по ходу драфта.</p>
         </div>
         <div className="row">
           {canFill && (
             <button className="btn primary" type="button" onClick={fillFromGame}>
-              Reset to the game's draft
+              Сбросить на драфт из игры
             </button>
           )}
           <button className="btn" type="button" onClick={() => update({ ...state, side: radiantIsUs ? "dire" : "radiant" })}>
-            Swap sides
+            Поменять стороны
           </button>
           <button className="btn" type="button" onClick={copyText}>
-            Copy as text
+            Копировать текстом
           </button>
           <button className="btn danger" type="button" onClick={() => update(EMPTY)}>
-            Clear
+            Очистить
           </button>
         </div>
       </div>
@@ -498,12 +525,12 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
           onRemove={remove}
         />
       </div>
-      <div className="bans" aria-label="Bans">
+      <div className="bans" aria-label="Баны">
         <button type="button" className="btn small" aria-pressed={target === "ban"} onClick={() => setTarget("ban")}>
-          {target === "ban" ? "Adding bans" : "Add bans"}
+          {target === "ban" ? "Добавляем баны" : "Добавить баны"}
         </button>
         {state.bans.map((b) => (
-          <button key={b} type="button" className="ban" onClick={() => remove(b)} title="Remove ban">
+          <button key={b} type="button" className="ban" onClick={() => remove(b)} title="Убрать бан">
             <Portrait hero={b} size={30} />
           </button>
         ))}
@@ -511,13 +538,13 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
 
       <div className="row" style={{ marginTop: "1rem", justifyContent: "space-between" }}>
         <Segmented
-          label="Rank bracket"
+          label="Ранговая группа"
           value={(bucket ?? settings?.rank_bucket ?? "all") as RankBucket}
           options={BUCKETS.map((b) => ({ value: b.value as RankBucket, label: b.label }))}
           onChange={setBucket}
         />
         <label className="row small">
-          Synergy weight
+          Вес синергии
           <input
             type="range"
             min={0}
@@ -537,22 +564,22 @@ export function DraftPage({ live }: { live: LiveSnapshot | null }) {
           taken={taken}
           onPick={add}
           onTab={() => setTarget((t) => (t === "us" ? "them" : "us"))}
-          placeholder={`Add to ${target === "ban" ? "bans" : target === "us" ? "your team" : "the enemy team"}: type am, qop, pudge… then Enter (/ to focus, Tab to switch team)`}
+          placeholder={`Добавить в ${target === "ban" ? "баны" : target === "us" ? "вашу команду" : "вражескую команду"}: введите am, qop, pudge… и Enter (/ — к поиску, Tab — сменить команду)`}
         />
       )}
       <details style={{ marginTop: "0.75rem" }}>
-        <summary className="small muted">Paste a list of heroes</summary>
+        <summary className="small muted">Вставить список героев</summary>
         <div className="row" style={{ marginTop: "0.5rem" }}>
           <textarea className="input" rows={2} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="am, lion, cm" />
           <button className="btn" type="button" onClick={() => void applyPaste()} disabled={!paste.trim()}>
-            Add to {target === "ban" ? "bans" : target === "us" ? "your team" : "enemy team"}
+            Добавить в {target === "ban" ? "баны" : target === "us" ? "вашу команду" : "вражескую команду"}
           </button>
           <span className="small muted">{pasteMsg}</span>
         </div>
       </details>
 
       <ErrorBox error={error} />
-      {isFetching && !data ? <p className="muted">Working out suggestions…</p> : null}
+      {isFetching && !data ? <p className="muted">Считаем подсказки…</p> : null}
       {data && (
         <Results
           res={data}

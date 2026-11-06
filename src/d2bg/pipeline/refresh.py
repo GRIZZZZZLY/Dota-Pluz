@@ -177,7 +177,7 @@ class Refresher:
         write_json(self.out / "hero_stats.json", doc)
         res = StepResult("hero_stats", ["hero_stats.json"], len(doc), self._calls_since(c0))
         self._record(
-            "hero_stats.json", "OpenDota /heroStats (recent public and pro matches)", res.rows, res.calls
+            "hero_stats.json", "OpenDota /heroStats (недавние публичные и про-матчи)", res.rows, res.calls
         )
         return res
 
@@ -200,7 +200,7 @@ class Refresher:
         return self._per_hero(
             "item_popularity",
             "item_popularity.json",
-            "OpenDota /heroes/{id}/itemPopularity (recent pro and high-rank matches)",
+            "OpenDota /heroes/{id}/itemPopularity (недавние про-матчи и матчи высокого ранга)",
             lambda h: transform.item_popularity_doc(
                 self.client.get(f"heroes/{h['id']}/itemPopularity", ttl=3 * DAY), ids
             ),
@@ -210,7 +210,7 @@ class Refresher:
         return self._per_hero(
             "benchmarks",
             "benchmarks.json",
-            "OpenDota /benchmarks (percentiles per hero)",
+            "OpenDota /benchmarks (перцентили по героям)",
             lambda h: transform.benchmarks_doc(
                 self.client.get("benchmarks", {"hero_id": h["id"]}, ttl=7 * DAY)
             ),
@@ -293,7 +293,7 @@ class Refresher:
         )
         self._record(
             "pro_builds.json",
-            "OpenDota /explorer (parsed pro matches)",
+            "OpenDota /explorer (разобранные про-матчи)",
             total_rows,
             res.calls,
             matches=n_matches,
@@ -324,7 +324,7 @@ class Refresher:
         for f in res.files:
             self._record(
                 f,
-                "OpenDota /publicMatches (ranked All Pick)",
+                "OpenDota /publicMatches (рейтинговый All Pick)",
                 len(keep),
                 calls,
                 source_week=doc["source_week"],
@@ -356,7 +356,7 @@ class Refresher:
             note=f"held-out accuracy {report['test']['accuracy']:.3f}",
         )
         self._record(
-            "draft_model.json", "Trained locally on public_matches.jsonl.gz", res.rows, 0, report=report
+            "draft_model.json", "Обучена локально на public_matches.jsonl.gz", res.rows, 0, report=report
         )
         return res
 
@@ -366,10 +366,10 @@ class Refresher:
             if step not in STEPS:
                 raise ValueError(f"unknown step {step!r}; choose from {', '.join(STEPS)}")
             started = time.monotonic()
-            self.progress(step, 0, 1, "starting")
+            self.progress(step, 0, 1, "начало")
             fn = getattr(self, step)
             result: StepResult = fn(**kwargs) if step == "matchups" else fn()
             result.seconds = round(time.monotonic() - started, 1)
-            self.progress(step, 1, 1, "done")
+            self.progress(step, 1, 1, "готово")
             results.append(result)
         return results

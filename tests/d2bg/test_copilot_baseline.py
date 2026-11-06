@@ -205,7 +205,7 @@ def test_buyback_guard(shared_ctx):
     c = context(shared_ctx, time_s=35 * 60.0, gold=5000, buyback_cost=3000)
     snap = {
         "next_items": [{"item": "butterfly", "name": "Butterfly", "remaining": 4000}],
-        "buyback_warning": "Buying Butterfly leaves 1000 gold; buyback costs 3000.",
+        "buyback_warning": "После покупки Butterfly останется 1000 золота, а выкуп стоит 3000.",
     }
     guard = next(r for r in baseline.recommendations(c, snap, shared_ctx) if r.type == "ITEM_BUYBACK_GUARD")
     assert guard.category == "buyback" and "1000" in guard.reason_ru and "3000" in guard.reason_ru
@@ -225,7 +225,7 @@ def test_talent_advice_from_pro_pick_rates(shared_ctx):
     assert talent.confidence_kind == "pro_pick_share" and talent.confidence == pytest.approx(0.828)
     assert baseline.rejection(talent, c, shared_ctx) is None
     done = c.model_copy(update={"talents": [False, True] + [False] * 6})
-    assert baseline.rejection(talent, done, shared_ctx) == "tier already taken"
+    assert baseline.rejection(talent, done, shared_ctx) == "талант этого уровня уже взят"
     assert not [
         r
         for r in baseline.recommendations(context(shared_ctx, level=9), {}, shared_ctx)
@@ -242,22 +242,32 @@ def test_validator_refuses_illegal_actions(shared_ctx):
         shared_ctx, level=5, available_skill_points=1, learned_skills={**dict.fromkeys(JUGG, 0), q: 2}
     )
     assert baseline.rejection(rec(c, "SKILL_LEVEL", q), c, shared_ctx) is None
-    assert baseline.rejection(rec(c, "SKILL_LEVEL", r), c, shared_ctx) == "cannot level: level"
-    maxed = c.model_copy(update={"level": 9, "learned_skills": {**c.learned_skills, q: 4}})
-    assert baseline.rejection(rec(maxed, "SKILL_LEVEL", q), maxed, shared_ctx) == "cannot level: max"
-    no_point = c.model_copy(update={"available_skill_points": 0})
-    assert baseline.rejection(rec(no_point, "SKILL_LEVEL", q), no_point, shared_ctx) == "no skill point"
     assert (
-        baseline.rejection(rec(c, "SKILL_LEVEL", "plus_high_five"), c, shared_ctx)
-        == "not one of his abilities"
+        baseline.rejection(rec(c, "SKILL_LEVEL", r), c, shared_ctx)
+        == "нельзя прокачать: не хватает уровня героя"
+    )
+    maxed = c.model_copy(update={"level": 9, "learned_skills": {**c.learned_skills, q: 4}})
+    assert (
+        baseline.rejection(rec(maxed, "SKILL_LEVEL", q), maxed, shared_ctx)
+        == "нельзя прокачать: способность уже на максимуме"
+    )
+    no_point = c.model_copy(update={"available_skill_points": 0})
+    assert (
+        baseline.rejection(rec(no_point, "SKILL_LEVEL", q), no_point, shared_ctx)
+        == "нет свободного очка способностей"
+    )
+    assert (
+        baseline.rejection(rec(c, "SKILL_LEVEL", "plus_high_five"), c, shared_ctx) == "это не его способность"
     )
     owned = context(shared_ctx, inventory=["black_king_bar"])
-    assert baseline.rejection(rec(owned, "ITEM_NEXT", "black_king_bar"), owned, shared_ctx) == "already owned"
-    assert baseline.rejection(rec(c, "ITEM_NEXT", "not_an_item"), c, shared_ctx) == "unknown item"
+    assert (
+        baseline.rejection(rec(owned, "ITEM_NEXT", "black_king_bar"), owned, shared_ctx) == "предмет уже есть"
+    )
+    assert baseline.rejection(rec(c, "ITEM_NEXT", "not_an_item"), c, shared_ctx) == "неизвестный предмет"
     ghost = rec(c, "ITEM_NEXT", "manta", evidence=["enemy:lion"])
-    assert baseline.rejection(ghost, c, shared_ctx) == "cites facts that are not in the context"
+    assert baseline.rejection(ghost, c, shared_ctx) == "ссылается на факты, которых нет в контексте"
     other = c.model_copy(update={"match_id": "2"})
-    assert baseline.rejection(rec(c, "ITEM_NEXT", "manta"), other, shared_ctx) == "another match"
+    assert baseline.rejection(rec(c, "ITEM_NEXT", "manta"), other, shared_ctx) == "другой матч"
     assert baseline.rejection(rec(c, "PICK_HERO", "lion"), c, shared_ctx) is not None
 
 

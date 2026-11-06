@@ -43,29 +43,29 @@ class Trait(StrEnum):
 
 
 LABELS: dict[Trait, str] = {
-    Trait.STUN: "Stun",
-    Trait.SILENCE: "Silence",
-    Trait.HEX: "Hex",
-    Trait.ROOT: "Root",
-    Trait.INVISIBILITY: "Invisibility",
-    Trait.ILLUSIONS: "Illusions",
-    Trait.SUMMONS: "Summons",
-    Trait.HEAL: "Heals allies",
-    Trait.SAVE: "Saves allies",
-    Trait.EVASION: "Evasion",
-    Trait.BREAK: "Applies Break",
-    Trait.PASSIVES: "Relies on passives",
-    Trait.MAGIC_DAMAGE: "Magic damage",
-    Trait.PHYSICAL_DAMAGE: "Physical damage",
-    Trait.PURE_DAMAGE: "Pure damage",
-    Trait.BKB_PIERCE: "Pierces spell immunity",
-    Trait.MOBILITY: "Mobility",
-    Trait.GLOBAL: "Global presence",
-    Trait.SLOW: "Slow",
-    Trait.ARMOR_REDUCTION: "Armor reduction",
-    Trait.MANA_BURN: "Mana burn",
-    Trait.LIFESTEAL: "Lifesteal",
-    Trait.TAUNT: "Taunt",
+    Trait.STUN: "Оглушение",
+    Trait.SILENCE: "Немота",
+    Trait.HEX: "Превращение",
+    Trait.ROOT: "Корни",
+    Trait.INVISIBILITY: "Невидимость",
+    Trait.ILLUSIONS: "Иллюзии",
+    Trait.SUMMONS: "Призванные существа",
+    Trait.HEAL: "Лечение союзников",
+    Trait.SAVE: "Спасение союзника",
+    Trait.EVASION: "Уклонение",
+    Trait.BREAK: "Break (отключает пассивки)",
+    Trait.PASSIVES: "Опора на пассивные способности",
+    Trait.MAGIC_DAMAGE: "Магический урон",
+    Trait.PHYSICAL_DAMAGE: "Физический урон",
+    Trait.PURE_DAMAGE: "Чистый урон",
+    Trait.BKB_PIERCE: "Сквозь BKB",
+    Trait.MOBILITY: "Мобильность",
+    Trait.GLOBAL: "Глобальные способности",
+    Trait.SLOW: "Замедление",
+    Trait.ARMOR_REDUCTION: "Снижение брони",
+    Trait.MANA_BURN: "Сжигание маны",
+    Trait.LIFESTEAL: "Вампиризм",
+    Trait.TAUNT: "Провокация",
 }
 
 DISABLES = (Trait.STUN, Trait.HEX, Trait.SILENCE, Trait.ROOT, Trait.TAUNT)
@@ -170,7 +170,7 @@ def derive(hero: Hero) -> dict[Trait, list[str]]:
         for a in magical:
             add(Trait.MAGIC_DAMAGE, a)
     if "Carry" in hero.roles and hero.primary_attr in ("agi", "str", "all"):
-        found.setdefault(Trait.PHYSICAL_DAMAGE, []).append("Right-click carry")
+        found.setdefault(Trait.PHYSICAL_DAMAGE, []).append("керри с автоатакой")
     elif len(physical) >= 2:
         for a in physical:
             add(Trait.PHYSICAL_DAMAGE, a)
@@ -189,7 +189,7 @@ def apply_overrides(
     for t in rule.get("remove", []):
         out.pop(Trait(t), None)
     for t in rule.get("add", []):
-        out.setdefault(Trait(t), []).append("reviewed")
+        out.setdefault(Trait(t), []).append("проверено вручную")
     return out
 
 

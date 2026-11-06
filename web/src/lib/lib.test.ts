@@ -34,11 +34,10 @@ describe("format", () => {
     expect(pct(null)).toBe("–");
     expect(pts(2.345)).toBe("+2.3");
     expect(pts(-1)).toBe("-1.0");
-    expect(gold(12345)).toBe("12,345");
-    expect(ordinal(1)).toBe("1st");
-    expect(ordinal(12)).toBe("12th");
-    expect(ordinal(23)).toBe("23rd");
-    expect(percentileText(0.62)).toBe("62nd percentile");
+    expect(gold(12345)).toBe("12 345"); // ru-RU groups with a no-break space
+    expect(ordinal(1)).toBe("1-й");
+    expect(ordinal(23)).toBe("23-й");
+    expect(percentileText(0.62)).toBe("62-й перцентиль");
   });
 });
 

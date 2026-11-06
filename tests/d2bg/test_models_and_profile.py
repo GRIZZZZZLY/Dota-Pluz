@@ -99,9 +99,7 @@ def _m(won: bool, start: int, hero: int = 1, slot: int = 0, **kw):
 
 def test_profile_analytics():
     assert (
-        a.rank_name(53) == "Legend 3"
-        and a.rank_name(80, 120) == "Immortal #120"
-        and a.rank_name(None) is None
+        a.rank_name(53) == "Легенда 3" and a.rank_name(80, 120) == "Титан #120" and a.rank_name(None) is None
     )
     assert a.wilson_lower(0, 0) == 0 and 0 < a.wilson_lower(6, 10) < 0.6
     ms = [

@@ -32,7 +32,7 @@ test("advice is ordered skill, talent, core, buyback, defensive, situational", (
     rec("TALENT"),
     rec("SKILL_LEVEL"),
   ]);
-  expect(sorted.map(adviceLabel)).toEqual(["Скилл", "Талант", "Основной предмет", "Выкуп", "Защита", "По ситуации"]);
+  expect(sorted.map(adviceLabel)).toEqual(["Способность", "Талант", "Основной предмет", "Выкуп", "Защита", "По ситуации"]);
 });
 
 test("demo, replays, stale and missing data are always labelled", () => {

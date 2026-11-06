@@ -18,10 +18,11 @@ from d2bg.context import AppContext
 DEFAULT_PORT = 4242
 LOOPBACK = {"127.0.0.1", "::1", "localhost", "testclient"}
 
-NOT_BUILT = """<!doctype html><html><head><meta charset="utf-8"><title>d2bg</title></head>
+NOT_BUILT = """<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>d2bg</title></head>
 <body style="font-family:system-ui;background:#111;color:#eee;padding:2rem">
-<h1>The UI is not built yet</h1><p>Run <code>.\\run.cmd</code>, or <code>npm ci &amp;&amp; npm run build</code>
-in <code>web/</code>. The API is up: <a style="color:#8cf" href="/docs">/docs</a>.</p></body></html>"""
+<h1>Интерфейс ещё не собран</h1><p>Запустите <code>.\\run.cmd</code> или выполните
+<code>npm ci &amp;&amp; npm run build</code> в папке <code>web/</code>. API уже работает:
+<a style="color:#8cf" href="/docs">/docs</a>.</p></body></html>"""
 
 
 def create_app(
@@ -57,7 +58,9 @@ def create_app(
                 or ""
             )
             if not lan or not hmac.compare_digest(token, settings.lan_token):
-                return JSONResponse({"detail": "LAN access needs the token from Settings"}, status_code=403)
+                return JSONResponse(
+                    {"detail": "Для доступа по локальной сети нужен токен из настроек"}, status_code=403
+                )
             response = await call_next(request)
             response.set_cookie("d2bg_token", settings.lan_token, httponly=True, samesite="strict")
             return response
@@ -75,7 +78,7 @@ def create_app(
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa(full_path: str) -> Response:
         if full_path.startswith(("api/", "gsi")):
-            return JSONResponse({"detail": "Not Found"}, status_code=404)
+            return JSONResponse({"detail": "Не найдено"}, status_code=404)
         if not (dist / "index.html").is_file():
             return HTMLResponse(NOT_BUILT)
         candidate = (dist / full_path).resolve()

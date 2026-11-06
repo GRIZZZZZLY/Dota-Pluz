@@ -117,29 +117,29 @@ def evaluate(rule: TimerRule, clock: float, state: TimerState) -> TimerView | No
 
     if rule.id == "roshan":
         if state.roshan_killed_at is None or rule.respawn_min is None or rule.respawn_max is None:
-            return view(None, "alive", "Alive (no kill seen)")
+            return view(None, "alive", "Жив (убийство не замечено)")
         lo = state.roshan_killed_at + rule.respawn_min
         hi = state.roshan_killed_at + rule.respawn_max
         if clock < lo:
-            return view(lo, "upcoming", f"May respawn {fmt(lo)}, certainly by {fmt(hi)}")
+            return view(lo, "upcoming", f"Может возродиться в {fmt(lo)}, точно к {fmt(hi)}")
         if clock < hi:
-            return view(hi, "window", f"May be up now; certainly up by {fmt(hi)}")
-        return view(None, "alive", f"Up since {fmt(hi)} at the latest")
+            return view(hi, "window", f"Возможно, уже жив; точно к {fmt(hi)}")
+        return view(None, "alive", f"Жив самое позднее с {fmt(hi)}")
     if rule.id == "aegis":
         if state.aegis_picked_at is None or rule.duration is None:
             return None
         end = state.aegis_picked_at + rule.duration
-        return None if clock >= end else view(end, "active", f"Expires at {fmt(end)}")
+        return None if clock >= end else view(end, "active", f"Истекает в {fmt(end)}")
     if rule.id == "tormentor":
         first = float(rule.first or 0)
         if state.tormentor_killed_at is not None and rule.respawn:
             back = state.tormentor_killed_at + rule.respawn
             if clock < back:
-                return view(back, "upcoming", f"Respawns at {fmt(back)}")
-            return view(None, "alive", "Up")
+                return view(back, "upcoming", f"Возродится в {fmt(back)}")
+            return view(None, "alive", "Жив")
         if clock < first:
-            return view(first, "upcoming", f"First spawn at {fmt(first)}")
-        return view(None, "alive", "Up (no kill seen)")
+            return view(first, "upcoming", f"Первое появление в {fmt(first)}")
+        return view(None, "alive", "Жив (убийство не замечено)")
     if rule.id == "day_night":
         period = rule.period or 300
         # Day starts at the horn; before it there is no cycle to count.
@@ -149,18 +149,18 @@ def evaluate(rule: TimerRule, clock: float, state: TimerState) -> TimerView | No
         is_day = (
             state.daytime if state.daytime is not None else (math.floor(max(clock, 0.0) / period) % 2 == 0)
         )
-        detail = ("Night" if is_day else "Day") + f" at {fmt(nxt)}"
+        detail = ("Ночь" if is_day else "День") + f" в {fmt(nxt)}"
         return view(nxt, "estimated" if estimated else "upcoming", detail)
     if rule.times:
         hit = next_fixed(rule.times, clock)
         if hit is None:
             return None
         i, at = hit
-        name = rule.names[i] if i < len(rule.names) else "Next"
-        return view(at, "upcoming", f"{name} at {fmt(at)}")
+        name = rule.names[i] if i < len(rule.names) else "Следующий раз"
+        return view(at, "upcoming", f"{name} в {fmt(at)}")
     if rule.first is not None and rule.interval:
         at = next_periodic(rule.first, rule.interval, clock)
-        return view(at, "upcoming", f"Next at {fmt(at)}")
+        return view(at, "upcoming", f"Следующий раз в {fmt(at)}")
     return None
 
 

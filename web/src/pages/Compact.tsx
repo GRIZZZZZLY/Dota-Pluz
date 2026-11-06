@@ -13,7 +13,7 @@ export function CompactPage({ live }: { live: LiveState }) {
   if (!snap || snap.phase === "waiting") {
     return (
       <div className="compact">
-        <p className="muted">Waiting for Dota. <Link to="/">Open the full app</Link></p>
+        <p className="muted">Ждём Dota. <Link to="/">Открыть полную версию</Link></p>
       </div>
     );
   }

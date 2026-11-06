@@ -102,7 +102,7 @@ def test_snapshot_says_what_came_from_the_game(shared_ctx):
     )
     sources = snap["draft"]["sources"]
     assert sources["you"] and sources["bans"]
-    assert "not send" in snap["draft"]["note"].lower()
+    assert "не передаёт игроку" in snap["draft"]["note"]
 
 
 def test_parser_reads_minimap_heroes_and_generic_events(shared_ctx):

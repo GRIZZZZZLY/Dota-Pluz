@@ -11,6 +11,19 @@ export function voiceUnlocked(): boolean {
   }
 }
 
+/** Speaks in Russian, with a Russian voice when the system has one. */
+function say(text: string): void {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ru-RU";
+  try {
+    const voice = window.speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith("ru"));
+    if (voice) u.voice = voice;
+  } catch {
+    // no voice list: the browser picks one for ru-RU
+  }
+  window.speechSynthesis.speak(u);
+}
+
 export function setVoice(on: boolean): void {
   try {
     localStorage.setItem(KEY, on ? "on" : "off");
@@ -18,7 +31,7 @@ export function setVoice(on: boolean): void {
     // private window: the choice lasts for this page only
   }
   if (on && "speechSynthesis" in window) {
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance("Voice on"));
+    say("Голос включён");
   }
 }
 
@@ -38,7 +51,7 @@ export function useSpeakAlerts(alerts: Alert[] | undefined, enabled: boolean): v
     }
     for (const a of [...alerts].reverse()) {
       if (a.id > spoken.current && a.speak) {
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(a.speak));
+        say(a.speak);
       }
     }
     spoken.current = newest;

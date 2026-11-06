@@ -71,8 +71,10 @@ class GameContext(BaseModel):
     talents: list[bool] = Field(default_factory=list)
     allies: list[int] = Field(default_factory=list)
     enemies_visible: list[int] = Field(default_factory=list)
-    # Per-slot recognition confidence; stays None until a CV draft source exists.
+    # Lowest match score of the picks read from the draft screen; None when none were.
     draft_confidence: float | None = None
+    # Draft-screen slots that hold a hero d2bg-cv could not read: shown as "?", never guessed.
+    draft_unknown_slots: int | None = None
     inventory: list[str] = Field(default_factory=list)
     backpack: list[str] = Field(default_factory=list)
     stash: list[str] = Field(default_factory=list)
@@ -118,3 +120,39 @@ class Recommendation(BaseModel):
     data_patch: str | None = None
     status: RecStatus = "suggested"
     expires_at: float | None = None
+
+
+class SlotReading(BaseModel):
+    side: Literal["radiant", "dire", "bans"]
+    index: int = Field(ge=0, le=23)
+    hero_id: int | None
+    score: float
+    margin: float
+
+
+class DraftObservation(BaseModel):
+    """What d2bg-cv read on the draft screen (spec F2.1).
+
+    Picks are by side, as the screen shows them (Radiant on the left); the app maps them to allies and
+    enemies once it knows his team. ``unknown_slots`` counts slots that hold a hero it could not read.
+    """
+
+    radiant: list[int] = Field(default_factory=list, max_length=5)
+    dire: list[int] = Field(default_factory=list, max_length=5)
+    bans: list[int] = Field(default_factory=list, max_length=24)
+    unknown_slots: int = Field(default=0, ge=0, le=34)
+    confidence: float = Field(ge=0.0, le=1.0)
+    capture_resolution: tuple[int, int]
+    slots: list[SlotReading] = Field(default_factory=list, max_length=34)
+
+
+class ManualDraft(BaseModel):
+    """His board on the Draft page, sent while a match runs so the Copilot uses his corrections."""
+
+    match_id: str
+    allies: list[int] = Field(default_factory=list, max_length=5)
+    enemies: list[int] = Field(default_factory=list, max_length=5)
+    bans: list[int] = Field(default_factory=list, max_length=24)
+    # Heroes the game or the screen reported that he took off the board. Sent explicitly: a hero
+    # reported after the board last synced is new, not removed.
+    removed: list[int] = Field(default_factory=list, max_length=34)

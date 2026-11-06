@@ -5,10 +5,10 @@ import { ErrorBox, HeroChip, ItemIcon, Loading, Segmented } from "../components/
 import { clock, gold, pct } from "../lib/format";
 
 const BANDS = [
-  { label: "Up to 500", max: 500 },
-  { label: "500 to 2,000", max: 2000 },
-  { label: "2,000 to 4,000", max: 4000 },
-  { label: "Over 4,000", max: Infinity },
+  { label: "До 500", max: 500 },
+  { label: "От 500 до 2000", max: 2000 },
+  { label: "От 2000 до 4000", max: 4000 },
+  { label: "Больше 4000", max: Infinity },
 ];
 
 export function ItemsPage() {
@@ -24,16 +24,16 @@ export function ItemsPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>Items</h1>
-          <p>Costs, recipes, what each item builds into and which heroes buy it in pro games.</p>
+          <h1>Предметы</h1>
+          <p>Стоимость, рецепты, во что собирается каждый предмет и какие герои покупают его в про-матчах.</p>
         </div>
       </div>
       <div className="row" style={{ marginBottom: "1rem" }}>
-        <input className="input" placeholder="Search items" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search items" />
-        <Segmented label="Kind" value={kind} onChange={setKind} options={[{ value: "shop", label: "Shop" }, { value: "neutral", label: "Neutral" }]} />
+        <input className="input" placeholder="Поиск предмета" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Поиск предмета" />
+        <Segmented label="Тип" value={kind} onChange={setKind} options={[{ value: "shop", label: "Магазин" }, { value: "neutral", label: "Нейтральные" }]} />
       </div>
       <ErrorBox error={error} />
-      {!data && !error && <Loading what="items" />}
+      {!data && !error && <Loading what="предметов" />}
       {kind === "shop"
         ? BANDS.map((band, i) => {
             const min = i === 0 ? 0 : BANDS[i - 1]!.max;
@@ -41,7 +41,7 @@ export function ItemsPage() {
             if (!group.length) return null;
             return (
               <section key={band.label} style={{ marginBottom: "1.25rem" }}>
-                <h2>{band.label} gold</h2>
+                <h2>{band.label} золота</h2>
                 <div className="order">
                   {group.map((it) => (
                     <ItemIcon key={it.key} itemKey={it.key} caption={<>{it.name}<br /><span className="gold">{gold(it.cost)}</span></>} />
@@ -55,7 +55,7 @@ export function ItemsPage() {
             if (!group.length) return null;
             return (
               <section key={tier} style={{ marginBottom: "1.25rem" }}>
-                <h2>Tier {tier}</h2>
+                <h2>Уровень {tier}</h2>
                 <div className="order">
                   {group.map((it) => (
                     <ItemIcon key={it.key} itemKey={it.key} />
@@ -65,7 +65,7 @@ export function ItemsPage() {
             );
           })}
       {kind === "neutral" && (
-        <p className="source">Tiers as listed in OpenDota's item data. Patch 7.41 changed which neutral items exist; some old ones may still be listed.</p>
+        <p className="source">Уровни взяты из данных предметов OpenDota. Патч 7.41 изменил набор нейтральных предметов, некоторые старые могут остаться в списке.</p>
       )}
     </>
   );
@@ -75,7 +75,7 @@ export function ItemPage() {
   const { key = "" } = useParams();
   const { data: item, error } = useItem(key);
   if (error) return <ErrorBox error={error} />;
-  if (!item) return <Loading what="the item" />;
+  if (!item) return <Loading what="предмета" />;
   return (
     <>
       <div className="hero-title">
@@ -83,9 +83,9 @@ export function ItemPage() {
         <div>
           <h1>{item.name}</h1>
           <p className="muted" style={{ margin: 0 }}>
-            <span className="gold">{gold(item.cost)} gold</span>
-            {item.recipe_cost ? `, recipe ${gold(item.recipe_cost)}` : ""}
-            {item.tier ? `, neutral tier ${item.tier}` : ""}
+            <span className="gold">{gold(item.cost)} золота</span>
+            {item.recipe_cost ? `, рецепт ${gold(item.recipe_cost)}` : ""}
+            {item.tier ? `, нейтральный, уровень ${item.tier}` : ""}
           </p>
         </div>
       </div>
@@ -113,7 +113,7 @@ export function ItemPage() {
         <section className="panel">
           {item.components_detail.length > 0 && (
             <>
-              <h3>Made from</h3>
+              <h3>Компоненты</h3>
               <div className="order" style={{ marginBottom: "1rem" }}>
                 {item.components_detail.map((c, i) => (
                   <ItemIcon key={`${c.key}${i}`} itemKey={c.key} />
@@ -123,7 +123,7 @@ export function ItemPage() {
           )}
           {item.builds_into.length > 0 && (
             <>
-              <h3>Builds into</h3>
+              <h3>Собирается в</h3>
               <div className="order" style={{ marginBottom: "1rem" }}>
                 {item.builds_into.map((c) => (
                   <ItemIcon key={c.key} itemKey={c.key} />
@@ -131,7 +131,7 @@ export function ItemPage() {
               </div>
             </>
           )}
-          <h3>Pro heroes that build it</h3>
+          <h3>Кто собирает его в про-матчах</h3>
           {item.bought_by.length ? (
             <table>
               <tbody>
@@ -140,19 +140,19 @@ export function ItemPage() {
                     <td>
                       <HeroChip hero={b.hero} size={22} />
                     </td>
-                    <td className="num">{pct(b.share, 0)} of games</td>
+                    <td className="num">{pct(b.share, 0)} матчей</td>
                     <td className="num muted">{clock(b.median_time)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p className="small muted">Not part of any pro hero's core build on this patch.</p>
+            <p className="small muted">На этом патче не входит в основную сборку ни одного героя у про-игроков.</p>
           )}
         </section>
       </div>
       <p>
-        <Link to="/items">All items</Link>
+        <Link to="/items">Все предметы</Link>
       </p>
     </>
   );

@@ -12,15 +12,18 @@ sends input, and the only file it writes into the Dota folder is the GSI config.
 | `<Steam>\steamapps\libraryfolders.vdf` and the registry value `HKCU\Software\Valve\Steam\SteamPath` | Read only | To find which drive Dota is installed on. |
 | `http://127.0.0.1:4242` | A local web server: Dota POSTs GSI JSON to `/gsi`; your browser loads the UI | Loopback only by default. LAN mode (for a phone) is opt-in and needs a token. |
 | `https://api.opendota.com` | HTTPS requests, about 1 per second at most, cached on disk | Hero, item, meta, matchup and benchmark data, your public profile and matches, replay-parse requests. |
-| `https://cdn.cloudflare.steamstatic.com` | Image downloads by your browser | Hero and item pictures from Valve's public CDN. |
-| `%LOCALAPPDATA%\d2bg\` | Read and write | Settings, API cache, refreshed data, GSI recordings. |
+| `https://cdn.cloudflare.steamstatic.com` | Image downloads by your browser; and, once, by `d2bg-cv templates` | Hero and item pictures from Valve's public CDN. The optional screen reader uses the hero pictures as recognition templates. |
+| `%LOCALAPPDATA%\d2bg\` | Read and write | Settings, API cache, refreshed data, GSI recordings, the Copilot journal (`copilot.sqlite3`), and for the optional screen reader its templates and calibration (`cv\`). |
+| Your main monitor (optional `d2bg-cv` only) | Screen capture, about twice a second | Only while d2bg reports the hero selection or strategy time of a real game (never a demo or a replay), to read the heroes on the draft screen. Frames stay in memory; nothing is saved unless you run `d2bg-cv snap`, which saves one frame. |
 
 ## Things the app never does
 
 - Read or write the memory of `dota2.exe`, inject code, or load anything into the game.
 - Draw inside the game. The optional compact window is an ordinary separate window.
 - Send keystrokes or mouse clicks, or automate anything in the game or Steam.
-- Capture network packets, the screen, or the game's console log.
+- Capture network packets or the game's console log. The core app (`d2bg`) never captures the
+  screen either; only the optional, separate `d2bg-cv` process does, and only during a real draft
+  (see the table above). It is off unless you start it.
 - Write any game file other than the GSI config above, or change Steam settings or launch options.
 - Use DotaPlus, Overwolf or any other private backend.
 
@@ -28,6 +31,16 @@ sends input, and the only file it writes into the Dota folder is the GSI config.
 process, input, capture or Windows-API libraries (`ctypes`, `pymem`, `pynput`, `pyautogui`,
 `keyboard`, `mouse`, `scapy`, `win32api`, `mss`, ...), mentions calls such as `ReadProcessMemory`,
 `OpenProcess` or `SendInput`, or writes into the Dota folder anywhere but the GSI installer.
+`tests/d2bg/test_cv_safety.py` holds `d2bg-cv` to the same list with one exception, `mss` for the
+capture, which may live in one file only, and checks that the core app never imports it.
+
+### Why reading the draft screen is a separate, optional process
+
+During a ranked draft the game does not send a player the enemy picks, but it shows them on screen.
+Reading what is already visible to you is a different thing from reading hidden client data, the
+target of Valve's 2023 bans. Still, it is a step beyond GSI, so it stays out of the core app: you
+install it on purpose (`uv sync --extra cv`), start it on purpose (`uv run d2bg-cv run`), and a slot
+it cannot read stays unknown for you to fill in, never guessed.
 
 ## Why this is within the rules
 

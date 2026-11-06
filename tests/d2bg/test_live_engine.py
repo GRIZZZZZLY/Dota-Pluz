@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from d2bg.gsi.demo import DEMO_MATCH_ID, demo_draft, demo_frames
-from d2bg.live.engine import LiveEngine
+from d2bg.live.engine import LiveEngine, _in_seconds
 
 
 @pytest.fixture
@@ -67,6 +67,18 @@ def test_in_game_state_timers_items_and_benchmarks(shared_ctx, frames):
     assert "timer" in kinds
 
 
+def test_spoken_seconds_agree_with_the_number():
+    assert [_in_seconds(n) for n in (1, 3, 11, 15, 21, 22, 60)] == [
+        "через 1 секунду",
+        "через 3 секунды",
+        "через 11 секунд",
+        "через 15 секунд",
+        "через 21 секунду",
+        "через 22 секунды",
+        "через 60 секунд",
+    ]
+
+
 def test_roshan_event_starts_the_window_and_alerts(shared_ctx, frames):
     engine = LiveEngine(shared_ctx)
     run(engine, frames, until=23 * 60)
@@ -75,7 +87,7 @@ def test_roshan_event_starts_the_window_and_alerts(shared_ctx, frames):
     assert rosh["status"] == "upcoming" and rosh["at"] == 22 * 60 + 480
     aegis = next(t for t in snap["timers"] if t["id"] == "aegis")
     assert aegis["at"] == 22 * 60 + 3 + 300
-    assert any("Roshan killed" in a["text"] for a in snap["alerts"])
+    assert any("Рошан убит" in a["text"] for a in snap["alerts"])
     assert [e["type"] for e in snap["events"]][:2] == ["roshan_killed", "aegis_picked_up"]
 
 

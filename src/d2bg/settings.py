@@ -97,7 +97,7 @@ class SettingsStore:
     def update(self, changes: dict[str, Any]) -> Settings:
         unknown = set(changes) - EDITABLE
         if unknown:
-            raise ValueError(f"not editable: {', '.join(sorted(unknown))}")
+            raise ValueError(f"нельзя изменить: {', '.join(sorted(unknown))}")
         with self._lock:
             merged = self._settings.model_dump()
             merged.update(changes)

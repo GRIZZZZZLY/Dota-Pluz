@@ -1,4 +1,4 @@
-<#
+﻿<#
   One command to install, build and start d2bg on Windows:   .\run.cmd   (or .\run.ps1)
 
   - Python 3.12 and the app's packages come from uv (it downloads Python if needed).
@@ -10,16 +10,27 @@
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 
+# Already running? Open it instead of starting a second copy: the second could not take the port.
+if (-not ($args -contains "--port")) {
+    try {
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri "http://127.0.0.1:4242/health" | Out-Null
+        Write-Host "d2bg уже запущен. Открываю http://127.0.0.1:4242/ (окно с первым запуском не закрывайте)." -ForegroundColor Green
+        Start-Process "http://127.0.0.1:4242/"
+        exit 0
+    }
+    catch { }
+}
+
 function Need($cmd, $hint) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        Write-Host "Missing: $cmd. $hint" -ForegroundColor Red
+        Write-Host "Не найдено: $cmd. $hint" -ForegroundColor Red
         exit 1
     }
 }
 
-Need "uv" "Install it with:  winget install astral-sh.uv   (then open a new terminal)"
+Need "uv" "Установите:  winget install astral-sh.uv   (потом откройте новый терминал)"
 
-Write-Host "Installing Python packages (first run takes a minute)..."
+Write-Host "Проверяю пакеты Python (первый запуск займёт около минуты)..."
 uv sync --quiet --inexact
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -29,15 +40,15 @@ $newestSource = Get-ChildItem -Path "web\src", "web\index.html", "web\package.js
 $needBuild = -not (Test-Path $dist) -or ($newestSource.LastWriteTime -gt (Get-Item $dist).LastWriteTime)
 
 if ($needBuild) {
-    Need "npm" "Install Node.js 20 or newer from https://nodejs.org (needed once to build the UI)"
+    Need "npm" "Установите Node.js 20 или новее с https://nodejs.org (нужно один раз, чтобы собрать интерфейс)"
     Push-Location web
     try {
         if (-not (Test-Path "node_modules")) {
-            Write-Host "Installing UI packages..."
+            Write-Host "Устанавливаю пакеты интерфейса..."
             npm ci --no-audit --no-fund
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }
-        Write-Host "Building the UI..."
+        Write-Host "Собираю интерфейс..."
         npm run build --silent
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
@@ -46,5 +57,6 @@ if ($needBuild) {
     }
 }
 
+Write-Host "Приложение работает, пока открыто это окно. Остановить: Ctrl+C."
 uv run d2bg serve @args
 exit $LASTEXITCODE

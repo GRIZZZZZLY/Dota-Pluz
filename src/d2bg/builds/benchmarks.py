@@ -9,11 +9,11 @@ from typing import Any
 METRICS = {
     "gold_per_min": "GPM",
     "xp_per_min": "XPM",
-    "kills_per_min": "Kills / min",
-    "last_hits_per_min": "Last hits / min",
-    "hero_damage_per_min": "Hero damage / min",
-    "hero_healing_per_min": "Healing / min",
-    "tower_damage": "Tower damage",
+    "kills_per_min": "Убийства в минуту",
+    "last_hits_per_min": "Ластхиты в минуту",
+    "hero_damage_per_min": "Урон по героям в минуту",
+    "hero_healing_per_min": "Лечение в минуту",
+    "tower_damage": "Урон по башням",
 }
 
 

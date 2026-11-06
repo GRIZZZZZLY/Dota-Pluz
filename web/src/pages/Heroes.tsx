@@ -6,10 +6,10 @@ import { POSITION_NAMES } from "../lib/format";
 import { searchHeroes } from "../lib/search";
 
 const ATTRS = [
-  { value: "str", label: "Strength" },
-  { value: "agi", label: "Agility" },
-  { value: "int", label: "Intelligence" },
-  { value: "all", label: "Universal" },
+  { value: "str", label: "Сила" },
+  { value: "agi", label: "Ловкость" },
+  { value: "int", label: "Интеллект" },
+  { value: "all", label: "Универсальные" },
 ];
 
 export function HeroesPage() {
@@ -26,21 +26,21 @@ export function HeroesPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>Heroes</h1>
-          <p>Builds, abilities, matchups and numbers for every hero on the current patch.</p>
+          <h1>Герои</h1>
+          <p>Сборки, способности, матчапы и цифры по каждому герою на текущем патче.</p>
         </div>
       </div>
       <div className="row" style={{ marginBottom: "1rem" }}>
-        <input className="input" placeholder="Search: am, qop, storm…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search heroes" />
+        <input className="input" placeholder="Поиск: am, qop, storm…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Поиск героя" />
         <Segmented
-          label="Position"
+          label="Позиция"
           value={position}
           onChange={setPosition}
-          options={[{ value: 0, label: "Any position" }, ...[1, 2, 3, 4, 5].map((p) => ({ value: p, label: `${p}. ${POSITION_NAMES[p]}` }))]}
+          options={[{ value: 0, label: "Любая позиция" }, ...[1, 2, 3, 4, 5].map((p) => ({ value: p, label: `${p}. ${POSITION_NAMES[p]}` }))]}
         />
       </div>
       <ErrorBox error={error} />
-      {!data && !error && <Loading what="heroes" />}
+      {!data && !error && <Loading what="героев" />}
       {ATTRS.map((attr) => {
         const group = filtered.filter((h) => h.primary_attr === attr.value).sort((a, b) => a.name.localeCompare(b.name));
         if (!group.length) return null;

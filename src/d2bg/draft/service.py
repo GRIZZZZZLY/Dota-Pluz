@@ -107,7 +107,7 @@ def analyze(ctx: AppContext, req: DraftRequest, settings: Settings) -> dict[str,
     sample = int(bucket.get("n_matches", 0))
     notes = []
     if sample < SMALL_SAMPLE:
-        notes.append(f"Only {sample} matches in this rank bracket; numbers are noisy.")
+        notes.append(f"Матчей в этом ранговом диапазоне: {sample}. Цифры неточные.")
 
     return {
         "bucket": opts["bucket"],

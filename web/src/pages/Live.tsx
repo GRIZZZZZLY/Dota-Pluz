@@ -15,15 +15,15 @@ export interface LiveState {
 }
 
 const PHASES: Record<string, string> = {
-  waiting: "Waiting for Dota",
-  menu: "In the menus",
-  loading: "Loading",
-  hero_selection: "Hero selection",
-  strategy: "Strategy time",
-  showcase: "Showcase",
-  pre_game: "Pre-game",
-  in_game: "In game",
-  post_game: "Game over",
+  waiting: "Ждём Dota",
+  menu: "В меню",
+  loading: "Загрузка",
+  hero_selection: "Выбор героев",
+  strategy: "Время стратегии",
+  showcase: "Показ героев",
+  pre_game: "Перед стартом",
+  in_game: "Идёт игра",
+  post_game: "Игра окончена",
 };
 
 export function NoGame({ online }: { online: boolean }) {
@@ -37,25 +37,26 @@ export function NoGame({ online }: { online: boolean }) {
   };
   return (
     <div className="empty">
-      <h2>No game yet</h2>
+      <h2>Игры пока нет</h2>
       {online ? (
         <p>
-          When Dota 2 sends its first Game State Integration update, this page fills in: timers, your next item, skill
-          reminders and the enemy draft. If you have not installed the GSI config, do that on <Link to="/setup">Setup</Link>.
+          Когда Dota 2 пришлёт первое обновление GSI (Game State Integration), страница заполнится: таймеры, следующий
+          предмет, подсказки по способностям и драфт врагов. Если конфиг GSI ещё не установлен, сделайте это на странице{" "}
+          <Link to="/setup">«Подключение»</Link>.
         </p>
       ) : (
-        <p>The app server is not answering. Start it with <code>.\run.cmd</code> and this page reconnects by itself.</p>
+        <p>Сервер приложения не отвечает. Запустите его командой <code>.\run.cmd</code>, и страница переподключится сама.</p>
       )}
       <div className="row">
         <button className="btn primary" type="button" onClick={start} disabled={!online}>
-          Play a demo match
+          Запустить демо-матч
         </button>
         <Link className="btn" to="/setup">
-          Set up GSI
+          Настроить GSI
         </Link>
       </div>
       <p className="small muted" style={{ marginTop: "0.75rem" }}>
-        The demo replays a made-up match at 8× speed so you can see every live feature.
+        Демо проигрывает выдуманный матч на скорости 8×, чтобы показать все функции страницы «Матч».
       </p>
       <ErrorBox error={error} />
     </div>
@@ -68,18 +69,18 @@ function Marks({ snap }: { snap: LiveSnapshot }) {
   useHotkeys(keys);
   return (
     <div className="row" style={{ marginTop: "1rem" }}>
-      <button className="btn" type="button" onClick={() => mark("roshan")} title="Shortcut R">
-        Roshan killed
+      <button className="btn" type="button" onClick={() => mark("roshan")} title="Клавиша R">
+        Рошан убит
       </button>
-      <button className="btn" type="button" onClick={() => mark("aegis")} title="Shortcut A">
-        Aegis taken
+      <button className="btn" type="button" onClick={() => mark("aegis")} title="Клавиша A">
+        Аегис взят
       </button>
-      <button className="btn" type="button" onClick={() => mark("tormentor")} title="Shortcut T">
-        Tormentor killed
+      <button className="btn" type="button" onClick={() => mark("tormentor")} title="Клавиша T">
+        Tormentor убит
       </button>
       {snap.timers?.some((t) => t.id === "roshan" && t.status !== "alive") && (
         <button className="btn" type="button" onClick={() => mark("clear_roshan")}>
-          Clear Roshan
+          Сбросить таймер Рошана
         </button>
       )}
     </div>
@@ -90,47 +91,47 @@ export function TimerColumn({ snap, compact = false }: { snap: LiveSnapshot; com
   return (
     <div>
       <div className="clockface">
-        <span className="time" aria-label="Game clock">
+        <span className="time" aria-label="Игровое время">
           {clock(snap.clock)}
         </span>
         <span className="muted">
           {PHASES[snap.phase] ?? snap.phase}
-          {snap.daytime === true ? ", day" : snap.daytime === false ? ", night" : ""}
-          {snap.paused ? ", paused" : ""}
+          {snap.daytime === true ? ", день" : snap.daytime === false ? ", ночь" : ""}
+          {snap.paused ? ", пауза" : ""}
         </span>
       </div>
       {snap.score && (snap.score.radiant !== null || snap.score.dire !== null) && (
         <p className="small" style={{ margin: "0.35rem 0 0" }}>
-          <span className="radiant">Radiant {snap.score.radiant ?? 0}</span>
+          <span className="radiant">Свет {snap.score.radiant ?? 0}</span>
           {"  "}
-          <span className="dire">Dire {snap.score.dire ?? 0}</span>
-          {snap.team ? <span className="muted"> (you are {snap.team})</span> : null}
+          <span className="dire">Тьма {snap.score.dire ?? 0}</span>
+          {snap.team ? <span className="muted"> (вы за {snap.team === "radiant" ? "Свет" : "Тьму"})</span> : null}
         </p>
       )}
       {snap.clock !== null && snap.clock !== undefined && <ClockRail timers={snap.timers ?? []} now={snap.clock} />}
       {!compact && <Marks snap={snap} />}
-      <p className="source">Timer rules for patch {snap.timer_patch}, from Valve's patch notes. Hover a timer for its source.</p>
+      <p className="source">Правила таймеров для патча {snap.timer_patch}, по патчноутам Valve. Наведите на таймер, чтобы увидеть источник.</p>
     </div>
   );
 }
 
 export function NextItems({ snap }: { snap: LiveSnapshot }) {
   const items = snap.next_items ?? [];
-  if (!items.length) return <p className="muted small">No build data for this hero yet.</p>;
+  if (!items.length) return <p className="muted small">Для этого героя пока нет данных о сборке.</p>;
   return (
     <div>
       {items.map((i, idx) => (
         <div className="next-item" key={i.item}>
-          <ItemIcon itemKey={i.item} caption={idx === 0 ? "Next" : i.name} />
+          <ItemIcon itemKey={i.item} caption={idx === 0 ? "Следующий" : i.name} />
           <div>
             <div className="row" style={{ justifyContent: "space-between" }}>
               <strong>{i.name}</strong>
-              <span className="gold">{i.remaining > 0 ? `${gold(i.remaining)} gold to go` : "Ready"}</span>
+              <span className="gold">{i.remaining > 0 ? `не хватает ${gold(i.remaining)} золота` : "Можно купить"}</span>
             </div>
-            <Bar value={i.progress} gold label={`${i.name} progress`} />
+            <Bar value={i.progress} gold label={`${i.name}: прогресс`} />
             <div className="meta">
-              {i.eta_seconds ? `About ${clock(i.eta_seconds)} at your GPM. ` : ""}
-              {i.pro_median ? `Pros finish it at ${i.pro_median} (median).` : ""}
+              {i.eta_seconds ? `Примерно ${clock(i.eta_seconds)} при вашем GPM. ` : ""}
+              {i.pro_median ? `Про-игроки собирают его к ${i.pro_median} (медиана).` : ""}
             </div>
           </div>
         </div>
@@ -141,7 +142,7 @@ export function NextItems({ snap }: { snap: LiveSnapshot }) {
 
 export function AlertList({ snap, limit = 30 }: { snap: LiveSnapshot; limit?: number }) {
   const alerts = (snap.alerts ?? []).slice(0, limit);
-  if (!alerts.length) return <p className="muted small">Alerts show up here, and are read out if voice is on.</p>;
+  if (!alerts.length) return <p className="muted small">Здесь появляются подсказки; если голос включён, они зачитываются вслух.</p>;
   return (
     <ul className="alerts" aria-live="polite">
       {alerts.map((a) => (
@@ -166,7 +167,7 @@ function VoiceToggle() {
         setOn(!on);
       }}
     >
-      {on ? "Voice on" : "Turn voice on"}
+      {on ? "Голос включён" : "Включить голос"}
     </button>
   );
 }
@@ -181,10 +182,10 @@ function HeroPanel({ snap }: { snap: LiveSnapshot }) {
         <div>
           <h2>{h.name}</h2>
           <span className="muted">
-            Level {h.level ?? "–"}
-            {h.alive === false ? <span className="bad">, dead, back in {h.respawn_seconds ?? "?"}s</span> : null}
+            Уровень {h.level ?? "–"}
+            {h.alive === false ? <span className="bad">, убит, возрождение через {h.respawn_seconds ?? "?"} с</span> : null}
             {h.scepter ? ", Aghanim's Scepter" : ""}
-            {h.shard ? ", Shard" : ""}
+            {h.shard ? ", Aghanim's Shard" : ""}
           </span>
         </div>
       </div>
@@ -193,13 +194,13 @@ function HeroPanel({ snap }: { snap: LiveSnapshot }) {
           <b>
             {s.kills}/{s.deaths}/{s.assists}
           </b>
-          <span>K/D/A{s.kill_participation !== null ? `, ${pct(s.kill_participation, 0)} of team kills` : ""}</span>
+          <span>K/D/A{s.kill_participation !== null ? `, участие в убийствах ${pct(s.kill_participation, 0)}` : ""}</span>
         </div>
         <div className="readout">
           <b>
             {s.last_hits}/{s.denies}
           </b>
-          <span>Last hits / denies</span>
+          <span>Ластхиты / денаи</span>
         </div>
         <div className="readout">
           <b>{s.gpm}</b>
@@ -207,15 +208,15 @@ function HeroPanel({ snap }: { snap: LiveSnapshot }) {
         </div>
         <div className="readout">
           <b className="gold">{gold(s.gold)}</b>
-          <span>Gold ({gold(s.gold_reliable)} reliable)</span>
+          <span>Золото (надёжное: {gold(s.gold_reliable)})</span>
         </div>
         <div className="readout">
           <b>{gold(s.net_worth)}</b>
-          <span>Net worth</span>
+          <span>Нетворс</span>
         </div>
         <div className="readout">
           <b className={s.buyback_cost && s.gold >= s.buyback_cost ? "good" : "bad"}>{gold(s.buyback_cost)}</b>
-          <span>Buyback{s.buyback_cooldown ? `, cooldown ${clock(s.buyback_cooldown)}` : ""}</span>
+          <span>Выкуп{s.buyback_cooldown ? `, перезарядка ${clock(s.buyback_cooldown)}` : ""}</span>
         </div>
       </div>
       {snap.items && (
@@ -234,11 +235,11 @@ function Pace({ snap }: { snap: LiveSnapshot }) {
   if (!snap.benchmarks?.length) return null;
   return (
     <section className="panel">
-      <h3>Pace against this hero's public games</h3>
+      <h3>Темп в сравнении с публичными играми на этом герое</h3>
       {snap.lh_target && (
         <p>
-          Last hits: <strong>{snap.lh_target.you}</strong>; the median player has about {snap.lh_target.now} by now and{" "}
-          {snap.lh_target.at_10} by 10:00.
+          Ластхиты: <strong>{snap.lh_target.you}</strong>; у медианного игрока к этому моменту около {snap.lh_target.now}, а к
+          10:00 — {snap.lh_target.at_10}.
         </p>
       )}
       {snap.benchmarks.map((b) => (
@@ -249,10 +250,10 @@ function Pace({ snap }: { snap: LiveSnapshot }) {
             </span>
             <span className="muted">{percentileText(b.percentile)}</span>
           </div>
-          <Bar value={b.percentile ?? 0} label={`${b.label} percentile`} />
+          <Bar value={b.percentile ?? 0} label={`${b.label}: перцентиль`} />
         </div>
       ))}
-      <p className="source">Percentiles from OpenDota benchmarks for this hero.</p>
+      <p className="source">Перцентили по данным OpenDota для этого героя.</p>
     </section>
   );
 }
@@ -262,16 +263,17 @@ function EnemyPanel({ snap }: { snap: LiveSnapshot }) {
   if (!enemies.length)
     return (
       <section className="panel">
-        <h3>Enemy draft</h3>
+        <h3>Драфт врагов</h3>
         <p className="muted small">
-          No enemy seen yet. Dota sends a player no enemy picks during the draft; after loading, each enemy appears here once you
-          see them on the minimap. To plan earlier, type them on the <Link to="/draft">Draft</Link> page.
+          Врагов пока не видно. Во время драфта Dota не сообщает игроку пики врагов; после загрузки каждый враг появится здесь,
+          как только вы увидите его на миникарте. Чтобы спланировать заранее, введите их на странице{" "}
+          <Link to="/draft">«Драфт»</Link>.
         </p>
       </section>
     );
   return (
     <section className="panel">
-      <h3>Enemy draft and what to buy against it</h3>
+      <h3>Драфт врагов и что против него купить</h3>
       <div className="row" style={{ marginBottom: "0.75rem" }}>
         {enemies.map((e) => (
           <HeroChip key={e} hero={e} size={24} />
@@ -280,7 +282,7 @@ function EnemyPanel({ snap }: { snap: LiveSnapshot }) {
       {(snap.situational_items ?? []).map((rule) => (
         <div key={rule.id} style={{ marginBottom: "0.75rem" }}>
           <div className="small">
-            <strong>{rule.reason}</strong> <span className="muted">({rule.heroes.join(", ")})</span>
+            <strong>{rule.reason_ru || rule.reason}</strong> <span className="muted">({rule.heroes.join(", ")})</span>
           </div>
           <div className="order">
             {rule.items.map((i) => (
@@ -297,16 +299,16 @@ function Spectating({ snap }: { snap: LiveSnapshot }) {
   if (!snap.players?.length) return null;
   return (
     <section className="panel">
-      <h3>All players (spectating)</h3>
+      <h3>Все игроки (режим зрителя)</h3>
       <table>
         <thead>
           <tr>
-            <th>Hero</th>
+            <th>Герой</th>
             <th className="num">K/D/A</th>
-            <th className="num">LH</th>
+            <th className="num" title="Ластхиты">LH</th>
             <th className="num">GPM</th>
-            <th className="num">Net worth</th>
-            <th>Items</th>
+            <th className="num">Нетворс</th>
+            <th>Предметы</th>
           </tr>
         </thead>
         <tbody>
@@ -337,7 +339,7 @@ export function LivePage({ live }: { live: LiveState }) {
     return (
       <>
         <div className="page-head">
-          <h1>Live</h1>
+          <h1>Матч</h1>
         </div>
         <NoGame online={online} />
       </>
@@ -346,14 +348,14 @@ export function LivePage({ live }: { live: LiveState }) {
   return (
     <>
       <div className="page-head">
-        <h1>Live</h1>
+        <h1>Матч</h1>
         <div className="row">
-          {snap.demo && <span className="tag">Demo match, made-up numbers</span>}
-          {snap.connection.source === "replay" && <span className="tag">Replaying a recording</span>}
+          {snap.demo && <span className="tag">Демо-матч, выдуманные цифры</span>}
+          {snap.connection.source === "replay" && <span className="tag">Воспроизводится запись</span>}
           <VoiceToggle />
           {snap.connection.source !== "game" && (
             <button className="btn" type="button" onClick={() => api.post("/api/live/reset")}>
-              Stop
+              Остановить
             </button>
           )}
         </div>
@@ -367,14 +369,14 @@ export function LivePage({ live }: { live: LiveState }) {
           {snap.buyback_warning && <div className="note">{snap.buyback_warning}</div>}
           {snap.next_items && (
             <section className="panel">
-              <h3>Next items</h3>
+              <h3>Следующие предметы</h3>
               <NextItems snap={snap} />
             </section>
           )}
           {snap.skills?.next && (snap.skills.unspent ?? 0) > 0 && (
             <div className="note">
-              {snap.skills.unspent} skill point{snap.skills.unspent === 1 ? "" : "s"} to spend. Pros usually take{" "}
-              <strong>{snap.skills.next.name}</strong> here ({pct(snap.skills.next.share, 0)} of pro games).
+              Нераспределённые очки способностей: {snap.skills.unspent}. Про-игроки здесь обычно берут{" "}
+              <strong>{snap.skills.next.name}</strong> ({pct(snap.skills.next.share, 0)} про-матчей).
             </div>
           )}
           <div className="grid cols-2">
@@ -382,13 +384,13 @@ export function LivePage({ live }: { live: LiveState }) {
             <EnemyPanel snap={snap} />
           </div>
           <section className="panel">
-            <h3>Alerts</h3>
+            <h3>Подсказки</h3>
             <AlertList snap={snap} />
           </section>
           {(snap.series?.length ?? 0) > 1 && (
             <section className="panel">
               <h3>
-                <span className="gold">Gold</span> and <span style={{ color: "var(--river)" }}>last hits</span> over the game
+                <span className="gold">Золото</span> и <span style={{ color: "var(--river)" }}>ластхиты</span> по ходу игры
               </h3>
               <LineChart points={snap.series ?? []} series={[{ key: "gold", className: "gold" }, { key: "last_hits", className: "lh" }]} />
             </section>

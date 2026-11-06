@@ -70,6 +70,21 @@ MIGRATIONS = [
     ALTER TABLE recommendations ADD COLUMN category TEXT;
     CREATE INDEX recommendations_by_status ON recommendations(match_id, status);
     """,
+    # 3: what the draft screen showed (d2bg-cv) and his corrections, stage 3. No foreign key: the
+    # screen can be read before the first GSI event creates the match row.
+    """
+    CREATE TABLE draft_observations (
+        id INTEGER PRIMARY KEY,
+        match_id TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        game_time_s REAL,
+        source TEXT NOT NULL,
+        confidence REAL,
+        unknown_slots INTEGER,
+        data TEXT NOT NULL
+    );
+    CREATE INDEX draft_observations_by_match ON draft_observations(match_id, created_at);
+    """,
 ]
 _JSON_FIELDS = ("alternatives", "evidence_ids")
 
@@ -167,6 +182,25 @@ class CopilotStore:
             )
             return cur.rowcount > 0
 
+    def add_draft_observation(
+        self, match_id: str, now: float, game_time_s: float | None, source: str, data: dict[str, Any]
+    ) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                """INSERT INTO draft_observations
+                       (match_id, created_at, game_time_s, source, confidence, unknown_slots, data)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    match_id,
+                    now,
+                    game_time_s,
+                    source,
+                    data.get("confidence"),
+                    data.get("unknown_slots"),
+                    json.dumps(data, separators=(",", ":")),
+                ),
+            )
+
     def expire_open(self) -> None:
         """Close every recommendation still shown. Only one match is live at a time."""
         with self._lock, self._db:
@@ -211,5 +245,5 @@ class CopilotStore:
         with self._lock:
             return {
                 t: int(self._db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0])  # noqa: S608 - fixed table names
-                for t in ("matches", "gsi_events_index", "recommendations")
+                for t in ("matches", "gsi_events_index", "recommendations", "draft_observations")
             }

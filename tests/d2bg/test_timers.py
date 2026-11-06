@@ -41,7 +41,7 @@ def test_rune_schedule_matches_patch_notes(rules):
 
 def test_neutral_tiers(rules):
     v = evaluate(rules["neutral_tier"], 1000, TimerState())
-    assert v.at == 1500 and "Tier 3" in v.detail
+    assert v.at == 1500 and "Уровень 3" in v.detail
 
 
 def test_roshan_window_and_aegis(rules):
@@ -67,7 +67,7 @@ def test_day_night_uses_observed_flip(rules):
     est = evaluate(rules["day_night"], 100, TimerState())
     assert est.status == "estimated" and est.at == 300
     seen = evaluate(rules["day_night"], 100, TimerState(day_flip_at=40, daytime=False))
-    assert seen.status == "upcoming" and seen.at == 340 and seen.detail.startswith("Day")
+    assert seen.status == "upcoming" and seen.at == 340 and seen.detail.startswith("День")
 
 
 def test_upcoming_sorts_and_filters(shared_ctx):
@@ -87,4 +87,4 @@ def test_load_defaults():
 
 def test_day_night_before_the_horn_counts_from_zero(rules):
     v = evaluate(rules["day_night"], -30, TimerState(daytime=True))
-    assert v.at == 300 and v.detail == "Night at 5:00"
+    assert v.at == 300 and v.detail == "Ночь в 5:00"

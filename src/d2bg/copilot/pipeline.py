@@ -32,6 +32,18 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
     # The engine keeps the last draft after a match ends; outside a match it is not this context's.
     draft = (snap.get("draft") or {}) if s.match_id else {}
     allies, enemies = list(draft.get("allies") or []), list(draft.get("enemies") or [])
+    screen = draft.get("screen") or {}
+    draft_sources = draft.get("sources") or {}
+    # The weakest source names the group: his corrections, else the screen reading, else the game.
+    draft_source: Source = (
+        "manual"
+        if "manual" in draft_sources
+        else "cv"
+        if "screen" in draft_sources
+        else "gsi"
+        if allies or enemies
+        else "unknown"
+    )
     positions = app.settings.get().positions
     position = positions[0] if len(positions) == 1 else None
     hero = s.hero if s.hero and s.hero.id else None
@@ -56,6 +68,8 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
         talents=list(hero.talents) if hero else [],
         allies=allies,
         enemies_visible=enemies,
+        draft_confidence=screen.get("confidence"),
+        draft_unknown_slots=screen.get("unknown"),
         inventory=[i.key for i in s.inventory],
         backpack=[i.key for i in s.backpack],
         stash=[i.key for i in s.stash],
@@ -71,7 +85,7 @@ def build_context(engine: LiveEngine, app: AppContext, now: float) -> GameContex
             patch="snapshot",
             hero="gsi" if hero else "unknown",
             position="manual" if position else "unknown",
-            draft="gsi" if allies or enemies else "unknown",
+            draft=draft_source,
             economy="gsi" if st else "unknown",
         ),
     )

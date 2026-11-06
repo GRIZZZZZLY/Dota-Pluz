@@ -63,7 +63,12 @@ def test_store_migrates_once_and_uses_wal(tmp_path):
     store.close()
     again = CopilotStore(path)  # reopening runs nothing twice
     assert again.version == len(MIGRATIONS)
-    assert again.counts() == {"matches": 0, "gsi_events_index": 0, "recommendations": 0}
+    assert again.counts() == {
+        "matches": 0,
+        "gsi_events_index": 0,
+        "recommendations": 0,
+        "draft_observations": 0,
+    }
     again.close()
 
 
@@ -252,7 +257,12 @@ def test_status_without_data(client, ctx):
     body = r.json()
     assert body["state"] == "no_data" and body["mode"] == "none" and body["match_id"] is None
     assert body["providers"] == {"baseline": {"configured": True, "online": True}}
-    assert body["journal"] == {"matches": 0, "gsi_events_index": 0, "recommendations": 0}
+    assert body["journal"] == {
+        "matches": 0,
+        "gsi_events_index": 0,
+        "recommendations": 0,
+        "draft_observations": 0,
+    }
     assert body["patch"]["data"] == ctx.data.patch and body["error"] is None
     settings = ctx.settings.get()
     assert settings.gsi_token not in r.text and settings.lan_token not in r.text

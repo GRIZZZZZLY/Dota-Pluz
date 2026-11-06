@@ -59,7 +59,7 @@ describe("HeroPicker", () => {
     const picked: string[] = [];
     const heroes = [row(2, "Axe"), row(3, "Bane"), row(4, "Abaddon")];
     wrap(<HeroPicker heroes={heroes} taken={new Set([4])} onPick={(h) => picked.push(h.name)} />);
-    const input = screen.getByLabelText("Search heroes");
+    const input = screen.getByLabelText("Поиск героя");
     fireEvent.change(input, { target: { value: "a" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(picked).toEqual(["Axe"]);
@@ -69,7 +69,7 @@ describe("HeroPicker", () => {
   it("calls onTab instead of moving focus", () => {
     let tabs = 0;
     wrap(<HeroPicker heroes={[row(2, "Axe")]} taken={new Set()} onPick={() => undefined} onTab={() => (tabs += 1)} />);
-    fireEvent.keyDown(screen.getByLabelText("Search heroes"), { key: "Tab" });
+    fireEvent.keyDown(screen.getByLabelText("Поиск героя"), { key: "Tab" });
     expect(tabs).toBe(1);
   });
 });

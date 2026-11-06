@@ -14,12 +14,12 @@ function HeroList({ label, ids, onChange }: { label: string; ids: number[]; onCh
       <h3>{label}</h3>
       <div className="row">
         {ids.map((id) => (
-          <button key={id} type="button" className="btn small" onClick={() => onChange(ids.filter((x) => x !== id))} title="Remove">
+          <button key={id} type="button" className="btn small" onClick={() => onChange(ids.filter((x) => x !== id))} title="Убрать">
             <HeroChip hero={id} size={20} link={false} />
           </button>
         ))}
         <button className="btn small" type="button" onClick={() => setOpen((o) => !o)}>
-          {open ? "Done" : "Add heroes"}
+          {open ? "Готово" : "Добавить героев"}
         </button>
       </div>
       {open && heroes && <HeroPicker heroes={heroes} taken={new Set(ids)} onPick={(h) => onChange([...ids, h.id])} />}
@@ -40,7 +40,7 @@ export function SettingsPage() {
   }, []);
 
   if (error) return <ErrorBox error={error} />;
-  if (!settings) return <Loading what="settings" />;
+  if (!settings) return <Loading what="настроек" />;
   const set = (changes: Partial<Settings>) => save.mutate(changes);
   const accountText = account ?? (settings.account_id ? String(settings.account_id) : "");
 
@@ -48,51 +48,51 @@ export function SettingsPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>Settings</h1>
-          <p>Saved on this computer in {version?.user_dir ?? "your user folder"}. Changes apply at once.</p>
+          <h1>Настройки</h1>
+          <p>Хранятся на этом компьютере в {version?.user_dir ?? "папке пользователя"}. Изменения применяются сразу.</p>
         </div>
       </div>
       <ErrorBox error={save.error} />
       <div className="grid cols-2">
         <section className="panel stack">
           <div>
-            <h3>Steam account ID</h3>
+            <h3>ID аккаунта Steam</h3>
             <div className="row">
-              <input className="input" value={accountText} onChange={(e) => setAccount(e.target.value.replace(/\D/g, ""))} placeholder="e.g. 123456789" aria-label="Account ID" />
+              <input className="input" value={accountText} onChange={(e) => setAccount(e.target.value.replace(/\D/g, ""))} placeholder="например, 123456789" aria-label="ID аккаунта" />
               <button className="btn" type="button" onClick={() => set({ account_id: accountText ? Number(accountText) : null })}>
-                Save account
+                Сохранить аккаунт
               </button>
             </div>
-            <p className="small muted">The number in your Dota profile or OpenDota URL (the 32-bit account ID).</p>
+            <p className="small muted">Число из профиля Dota или из адреса OpenDota (32-битный ID аккаунта).</p>
           </div>
           <div>
-            <h3>Rank bracket for advice</h3>
-            <Segmented label="Rank bracket" value={settings.rank_bucket} onChange={(v) => set({ rank_bucket: v })} options={BUCKETS.map((b) => ({ value: b.value, label: b.label }))} />
+            <h3>Ранговая группа для советов</h3>
+            <Segmented label="Ранговая группа" value={settings.rank_bucket} onChange={(v) => set({ rank_bucket: v })} options={BUCKETS.map((b) => ({ value: b.value, label: b.label }))} />
           </div>
           <div>
-            <h3>Synergy weight ({settings.synergy_weight.toFixed(2)})</h3>
-            <input type="range" min={0} max={1} step={0.05} value={settings.synergy_weight} onChange={(e) => set({ synergy_weight: Number(e.target.value) })} aria-label="Synergy weight" />
-            <p className="small muted">0 ranks picks only by how they do against the enemy; 1 counts synergy with your team fully.</p>
+            <h3>Вес синергии ({settings.synergy_weight.toFixed(2)})</h3>
+            <input type="range" min={0} max={1} step={0.05} value={settings.synergy_weight} onChange={(e) => set({ synergy_weight: Number(e.target.value) })} aria-label="Вес синергии" />
+            <p className="small muted">0: пики оцениваются только по игре против врагов; 1: синергия с вашей командой учитывается полностью.</p>
           </div>
           <div>
-            <h3>Hero pool</h3>
+            <h3>Пул героев</h3>
             <Segmented
-              label="Hero pool mode"
+              label="Режим пула героев"
               value={settings.pool_mode}
               onChange={(v) => set({ pool_mode: v })}
               options={[
-                { value: "off", label: "Ignore" },
-                { value: "boost", label: "Prefer my heroes" },
-                { value: "only", label: "Only my heroes" },
+                { value: "off", label: "Не учитывать" },
+                { value: "boost", label: "Предпочитать моих героев" },
+                { value: "only", label: "Только мои герои" },
               ]}
             />
           </div>
-          <HeroList label="My heroes" ids={settings.hero_pool} onChange={(ids) => set({ hero_pool: ids })} />
-          <HeroList label="Never suggest" ids={settings.blacklist} onChange={(ids) => set({ blacklist: ids })} />
+          <HeroList label="Мои герои" ids={settings.hero_pool} onChange={(ids) => set({ hero_pool: ids })} />
+          <HeroList label="Никогда не предлагать" ids={settings.blacklist} onChange={(ids) => set({ blacklist: ids })} />
         </section>
         <section className="panel stack">
           <div>
-            <h3>Timers</h3>
+            <h3>Таймеры</h3>
             {timerRules.map((r) => {
               const on = settings.timers.enabled[r.id] ?? r.default_on;
               return (
@@ -104,48 +104,49 @@ export function SettingsPage() {
             })}
             <label className="check small" style={{ marginTop: "0.5rem" }}>
               <input type="checkbox" checked={settings.timers.voice} onChange={(e) => set({ timers: { ...settings.timers, voice: e.target.checked } })} />
-              Read alerts out loud (turn voice on once on the Live page too; browsers need a click)
+              Голосовые подсказки (голос также нужно один раз включить на странице «Матч»: браузеру нужен клик)
             </label>
           </div>
           <div>
-            <h3>After each game</h3>
+            <h3>После каждой игры</h3>
             <label className="check small">
               <input type="checkbox" checked={settings.auto_post_game} onChange={(e) => set({ auto_post_game: e.target.checked })} />
-              Fetch the match from OpenDota when it ends (a few requests per game)
+              Загружать матч из OpenDota после окончания (несколько запросов на игру)
             </label>
             <label className="check small">
               <input type="checkbox" checked={settings.request_parse} onChange={(e) => set({ request_parse: e.target.checked })} />
-              Also ask OpenDota to parse the replay (gives item timings)
+              Также просить OpenDota разобрать реплей (даёт тайминги предметов)
             </label>
             <label className="check small">
               <input type="checkbox" checked={settings.record_gsi} onChange={(e) => set({ record_gsi: e.target.checked })} />
-              Record games on this computer for replay (keeps the newest {settings.keep_recordings})
+              Записывать игры на этом компьютере для воспроизведения (хранятся последние, не больше {settings.keep_recordings})
             </label>
           </div>
           <div>
-            <h3>OpenDota API key (optional)</h3>
+            <h3>API-ключ OpenDota (необязательно)</h3>
             <div className="row">
-              <input className="input" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={settings.opendota_api_key ? "A key is saved" : "Paste your key"} aria-label="OpenDota API key" />
+              <input className="input" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={settings.opendota_api_key ? "Ключ сохранён" : "Вставьте ключ"} aria-label="API-ключ OpenDota" />
               <button className="btn" type="button" disabled={!key} onClick={() => { set({ opendota_api_key: key }); setKey(""); }}>
-                Save key
+                Сохранить ключ
               </button>
               {settings.opendota_api_key && (
                 <button className="btn danger" type="button" onClick={() => set({ opendota_api_key: null })}>
-                  Forget key
+                  Удалить ключ
                 </button>
               )}
             </div>
-            <p className="small muted">Raises OpenDota's limits. Create one yourself at opendota.com; it stays on this computer.</p>
+            <p className="small muted">Повышает лимиты OpenDota. Создайте ключ сами на opendota.com; он хранится только на этом компьютере.</p>
           </div>
           <div>
-            <h3>Look</h3>
-            <Segmented label="Theme" value={settings.theme} onChange={(v) => set({ theme: v })} options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }]} />
+            <h3>Оформление</h3>
+            <Segmented label="Тема" value={settings.theme} onChange={(v) => set({ theme: v })} options={[{ value: "dark", label: "Тёмная" }, { value: "light", label: "Светлая" }]} />
           </div>
           <div>
-            <h3>Phone or second screen</h3>
+            <h3>Телефон или второй экран</h3>
             <p className="small">
-              Open <code>/compact</code> for a small view of timers and your next item. To use it from a phone on your Wi-Fi, start the
-              app with <code>.\run.cmd --lan</code>; it prints the address with the access token.
+              Откройте <code>/compact</code>: это компактный вид с таймерами и следующим предметом. Чтобы открыть его с телефона в
+              вашей Wi-Fi-сети, запустите приложение в режиме локальной сети: <code>.\run.cmd --lan</code>; оно выведет адрес с
+              токеном доступа.
             </p>
           </div>
         </section>

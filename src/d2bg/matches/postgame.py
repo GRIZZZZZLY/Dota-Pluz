@@ -67,7 +67,7 @@ class PostGame:
                         self.ctx.client.post(f"request/{match_id}")
                         self._set(match_id, parse_requested=True)
                     except OpenDotaError as exc:
-                        self._set(match_id, error=f"parse request failed: {exc}")
+                        self._set(match_id, error=f"не удалось запросить разбор реплея: {exc}")
                 self._set(match_id, status="ready", error=None)
                 return
         self._set(match_id, status="gave_up")

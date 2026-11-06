@@ -9,6 +9,8 @@ export interface BoardState {
   matchId?: string | null;
   /** Heroes the game already reported, so a hero he removed by hand is not added back. */
   fromGame?: number[];
+  /** He changed the board himself in this match; only then is it sent to the Copilot as his correction. */
+  edited?: boolean;
 }
 
 export interface GameDraft {

@@ -13,51 +13,51 @@ export function MetaPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>Meta</h1>
-          <p>Win rates on the current patch. Tiers are win-rate bands: the top tenth is S, the bottom fifth D.</p>
+          <h1>Мета</h1>
+          <p>Винрейты на текущем патче. Тиры — диапазоны винрейта: верхняя десятая часть — S, нижняя пятая — D.</p>
         </div>
       </div>
       <div className="stack" style={{ marginBottom: "1rem" }}>
         <Segmented
-          label="Source"
+          label="Источник"
           value={source}
           onChange={setSource}
           options={[
-            { value: "bracket", label: "Public by medal" },
-            { value: "matrix", label: "Ranked All Pick sample" },
-            { value: "pro", label: "Pro" },
-            { value: "turbo", label: "Turbo" },
+            { value: "bracket", label: "Публичные по медалям" },
+            { value: "matrix", label: "Выборка Ranked All Pick" },
+            { value: "pro", label: "Про-матчи" },
+            { value: "turbo", label: "Турбо" },
           ]}
         />
         {source === "bracket" && (
           <Segmented
-            label="Medal"
+            label="Медаль"
             value={bracket ?? 0}
             onChange={(v) => setBracket(v || null)}
-            options={[{ value: 0, label: "All medals" }, ...MEDALS.map((m, i) => ({ value: i + 1, label: m }))]}
+            options={[{ value: 0, label: "Все медали" }, ...MEDALS.map((m, i) => ({ value: i + 1, label: m }))]}
           />
         )}
         <Segmented
-          label="Position"
+          label="Позиция"
           value={position ?? 0}
           onChange={(v) => setPosition(v || null)}
-          options={[{ value: 0, label: "Any position" }, ...[1, 2, 3, 4, 5].map((p) => ({ value: p, label: POSITION_NAMES[p]! }))]}
+          options={[{ value: 0, label: "Любая позиция" }, ...[1, 2, 3, 4, 5].map((p) => ({ value: p, label: POSITION_NAMES[p]! }))]}
         />
       </div>
       <ErrorBox error={error} />
-      {!data && !error && <Loading what="the meta" />}
+      {!data && !error && <Loading what="меты" />}
       {data && (
         <section className="panel" style={{ opacity: isFetching ? 0.6 : 1 }}>
           <table>
             <thead>
               <tr>
-                <th>Tier</th>
-                <th>Hero</th>
-                <th className="num">Win rate</th>
-                <th className="num">Games</th>
-                <th className="num">Pick share</th>
-                {source === "pro" && <th className="num">Bans</th>}
-                <th>Positions</th>
+                <th>Тир</th>
+                <th>Герой</th>
+                <th className="num">Винрейт</th>
+                <th className="num">Матчи</th>
+                <th className="num">Доля пиков</th>
+                {source === "pro" && <th className="num">Баны</th>}
+                <th>Позиции</th>
               </tr>
             </thead>
             <tbody>
@@ -68,7 +68,7 @@ export function MetaPage() {
                     <HeroChip hero={r.hero} size={26} />
                   </td>
                   <td className="num">{pct(r.win_rate)}</td>
-                  <td className="num">{r.picks.toLocaleString()}</td>
+                  <td className="num">{r.picks.toLocaleString("ru-RU")}</td>
                   <td className="num muted">{pct(r.pick_share)}</td>
                   {source === "pro" && <td className="num">{r.bans}</td>}
                   <td className="small muted">{r.positions.join(", ")}</td>
@@ -77,7 +77,7 @@ export function MetaPage() {
             </tbody>
           </table>
           <p className="source">
-            {data.data_source ?? "OpenDota"}, updated {dateTime(data.generated_at)}. Heroes under 0.5% of picks are left out.
+            {data.data_source ?? "OpenDota"}, обновлено {dateTime(data.generated_at)}. Герои с долей пиков меньше 0,5% не показаны.
           </p>
         </section>
       )}

@@ -20,9 +20,9 @@ function PlayerSearch({ onPick }: { onPick: (id: number) => void }) {
   return (
     <div>
       <div className="row">
-        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void run()} placeholder="Account ID or player name" aria-label="Find a player" />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void run()} placeholder="ID аккаунта или имя игрока" aria-label="Найти игрока" />
         <button className="btn" type="button" onClick={() => void run()} disabled={q.trim().length < 2}>
-          Find player
+          Найти игрока
         </button>
       </div>
       <ErrorBox error={error} />
@@ -50,21 +50,21 @@ export function ProfilePage() {
     <>
       <div className="page-head">
         <div>
-          <h1>{other ? "Player" : "Your profile"}</h1>
-          <p>From OpenDota's public match data. The Dota profile needs "Expose public match data" turned on in the game's settings.</p>
+          <h1>{other ? "Игрок" : "Ваш профиль"}</h1>
+          <p>По публичным данным матчей из OpenDota. В настройках Dota должна быть включена опция «Expose public match data».</p>
         </div>
         {other && (
           <button className="btn" type="button" onClick={() => setOther(null)}>
-            Back to your profile
+            Назад к вашему профилю
           </button>
         )}
       </div>
       {!account && (
         <div className="empty">
-          <h2>No account yet</h2>
+          <h2>Аккаунт не указан</h2>
           <p>
-            Add your Steam account ID in <Link to="/settings">Settings</Link>, or play one game with GSI on and it fills in by itself.
-            You can also look anyone up below.
+            Укажите ID аккаунта Steam в разделе <Link to="/settings">Настройки</Link> или сыграйте одну игру с включённым GSI, и он
+            заполнится сам. Ниже можно найти любого игрока.
           </p>
         </div>
       )}
@@ -72,21 +72,21 @@ export function ProfilePage() {
         <PlayerSearch onPick={setOther} />
       </section>
       <ErrorBox error={error} />
-      {account && !p && isFetching && <Loading what="the profile (one OpenDota call per section)" />}
+      {account && !p && isFetching && <Loading what="профиля (по одному запросу к OpenDota на раздел)" />}
       {p && (
         <div className="stack">
           <section className="panel">
             <div className="hero-head">
               {p.avatar ? <img src={p.avatar} alt="" width={64} height={64} style={{ borderRadius: 4 }} /> : null}
               <div>
-                <h2>{p.name ?? `Account ${p.account_id}`}</h2>
+                <h2>{p.name ?? `Аккаунт ${p.account_id}`}</h2>
                 <span className="muted">
-                  {p.rank ?? "Unranked or hidden"}
+                  {p.rank ?? "Без ранга или ранг скрыт"}
                   {p.profile_url ? (
                     <>
                       {", "}
                       <a href={p.profile_url} target="_blank" rel="noreferrer">
-                        Steam profile
+                        профиль Steam
                       </a>
                     </>
                   ) : null}
@@ -97,73 +97,73 @@ export function ProfilePage() {
               <div className="readout">
                 <b>{pct(p.summary.win_rate)}</b>
                 <span>
-                  Win rate, last {p.summary.games} games
+                  Винрейт за последние матчи: {p.summary.games}
                 </span>
               </div>
               <div className="readout">
                 <b>
                   {p.summary.recent_20.wins}-{p.summary.recent_20.games - p.summary.recent_20.wins}
                 </b>
-                <span>Last 20</span>
+                <span>Последние 20</span>
               </div>
               <div className="readout">
                 <b className={p.streaks.current_kind === "win" ? "good" : "bad"}>
-                  {p.streaks.current} {p.streaks.current_kind === "win" ? "W" : "L"}
+                  {p.streaks.current} {p.streaks.current_kind === "win" ? "В" : "П"}
                 </b>
-                <span>Current streak</span>
+                <span>Текущая серия</span>
               </div>
               <div className="readout">
                 <b>{pct(p.ranked_summary.win_rate)}</b>
-                <span>Ranked ({p.ranked_summary.games})</span>
+                <span>Рейтинговые ({p.ranked_summary.games})</span>
               </div>
               <div className="readout">
                 <b>{p.summary.avg_kda ?? "–"}</b>
-                <span>Average KDA</span>
+                <span>Средний KDA</span>
               </div>
             </div>
             {p.streaks.current_kind === "loss" && p.streaks.current >= 3 && (
               <div className="note" style={{ marginTop: "1rem" }}>
-                {p.streaks.current} losses in a row. Your longest losing run in these games was {p.streaks.longest_loss}.
+                Поражений подряд: {p.streaks.current}. Самая длинная серия поражений в этих матчах: {p.streaks.longest_loss}.
               </div>
             )}
           </section>
           <div className="grid cols-2">
             <section className="panel">
-              <h3>Sessions</h3>
+              <h3>Сессии</h3>
               {p.sessions.map((s) => (
                 <div key={s.start} className="row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
                   <span className="small">{dateTime(s.start)}</span>
-                  <span className="results-strip" aria-label={`${s.wins} wins, ${s.games - s.wins} losses`}>
+                  <span className="results-strip" aria-label={`Побед: ${s.wins}, поражений: ${s.games - s.wins}`}>
                     {s.results.map((r, i) => (
                       <i key={i} className={r === "W" ? "w" : ""} />
                     ))}
                   </span>
                 </div>
               ))}
-              <p className="source">Games less than two hours apart count as one session.</p>
+              <p className="source">Матчи с перерывом меньше двух часов считаются одной сессией.</p>
             </section>
             <section className="panel">
-              <h3>Win rate by hour you started</h3>
+              <h3>Винрейт по часу начала матча</h3>
               <div className="hours">
                 {Array.from({ length: 24 }, (_, h) => {
                   const row = p.by_hour.find((r) => r.hour === h);
-                  return <i key={h} title={row ? `${h}:00, ${row.games} games, ${pct(row.win_rate, 0)}` : `${h}:00, no games`} style={{ height: `${row ? Math.max(row.win_rate * 100, 3) : 0}%`, opacity: row ? Math.min(0.35 + row.games / 15, 1) : 0 }} />;
+                  return <i key={h} title={row ? `${h}:00, матчей: ${row.games}, ${pct(row.win_rate, 0)}` : `${h}:00, матчей нет`} style={{ height: `${row ? Math.max(row.win_rate * 100, 3) : 0}%`, opacity: row ? Math.min(0.35 + row.games / 15, 1) : 0 }} />;
                 })}
               </div>
-              <p className="source">Bar height is the win rate; fainter bars have fewer games. Hours are this computer's time zone.</p>
+              <p className="source">Высота столбца — винрейт; чем бледнее столбец, тем меньше матчей. Время — в часовом поясе этого компьютера.</p>
             </section>
           </div>
           <section className="panel">
-            <h3>Hero pool</h3>
+            <h3>Пул героев</h3>
             <table>
               <thead>
                 <tr>
-                  <th>Hero</th>
-                  <th className="num">Games</th>
-                  <th className="num">Win rate</th>
-                  <th className="num" title="95% lower bound: a win rate you can trust given the number of games">Safe estimate</th>
+                  <th>Герой</th>
+                  <th className="num">Матчи</th>
+                  <th className="num">Винрейт</th>
+                  <th className="num" title="Нижняя граница 95%: винрейт, на который можно положиться с учётом числа матчей">Надёжная оценка</th>
                   <th className="num">KDA</th>
-                  <th className="num">Last played</th>
+                  <th className="num">Последняя игра</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,19 +183,19 @@ export function ProfilePage() {
             </table>
             {p.worth_adding.length > 0 && (
               <p className="small" style={{ marginTop: "0.75rem" }}>
-                Heroes with a matchup profile like your most-played ones:{" "}
-                {p.worth_adding.map((w) => `${w.name} (like ${w.similar_to.join(", ")})`).join("; ")}.
+                Похожие герои, которых стоит добавить в пул:{" "}
+                {p.worth_adding.map((w) => `${w.name} (как ${w.similar_to.join(", ")})`).join("; ")}.
               </p>
             )}
           </section>
           <div className="grid cols-2">
             <section className="panel">
-              <h3>Recent matches</h3>
+              <h3>Последние матчи</h3>
               <table>
                 <tbody>
                   {p.recent.slice(0, 15).map((m) => (
                     <tr key={m.match_id ?? m.start_time}>
-                      <td className={m.won ? "good" : "bad"}>{m.won ? "Won" : "Lost"}</td>
+                      <td className={m.won ? "good" : "bad"}>{m.won ? "Победа" : "Поражение"}</td>
                       <td>
                         <HeroChip hero={m.hero_id} size={22} />
                       </td>
@@ -203,14 +203,14 @@ export function ProfilePage() {
                         {m.kills}/{m.deaths}/{m.assists}
                       </td>
                       <td className="num muted small">{clock(m.duration)}</td>
-                      <td>{m.match_id ? <Link to={`/match/${m.match_id}`}>Review</Link> : null}</td>
+                      <td>{m.match_id ? <Link to={`/match/${m.match_id}`}>Разбор</Link> : null}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </section>
             <section className="panel">
-              <h3>Players you queue with</h3>
+              <h3>С кем вы играете</h3>
               <ErrorBox error={peers.error} />
               <table>
                 <tbody>
@@ -221,15 +221,15 @@ export function ProfilePage() {
                           {pe.name ?? pe.account_id}
                         </button>
                       </td>
-                      <td className="num">{pe.with_games} games together</td>
-                      <td className="num">{pct(pe.with_win_rate, 0)} won</td>
+                      <td className="num">матчей вместе: {pe.with_games}</td>
+                      <td className="num">побед: {pct(pe.with_win_rate, 0)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </section>
           </div>
-          <p className="source">{p.matches_considered} matches considered (OpenDota "significant" matches only).</p>
+          <p className="source">Учтено матчей: {p.matches_considered} (только «значимые» матчи OpenDota).</p>
         </div>
       )}
     </>

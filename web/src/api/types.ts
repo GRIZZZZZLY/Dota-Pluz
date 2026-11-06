@@ -179,6 +179,8 @@ export interface TeamReport {
 export interface SituationalRule {
   id: string;
   reason: string;
+  reason_ru?: string;
+  category?: string;
   heroes: string[];
   items: (ItemRef & { owned: boolean })[];
 }
@@ -321,6 +323,8 @@ export interface LiveSnapshot {
     /** What the game itself supplied so far, by kind: you, bans, allies, enemies. */
     sources?: Record<string, string>;
     note?: string;
+    /** The last reading of the draft screen by d2bg-cv: slots it could not read, and its weakest match. */
+    screen?: { unknown: number; confidence: number } | null;
   };
   situational_items?: SituationalRule[];
   enemy_threats?: { hero: number; traits: TraitView[]; countered_by: number[] }[];
@@ -553,5 +557,7 @@ export interface CopilotStatus {
   providers: Record<string, { configured: boolean; online: boolean }>;
   journal: Record<string, number>;
   rejected: { type: string; candidate: string; reason: string }[];
+  /** d2bg-cv asked for the status in the last few seconds. */
+  screen_reader: { running: boolean };
   error: string | null;
 }

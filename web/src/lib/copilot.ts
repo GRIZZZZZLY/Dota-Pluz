@@ -15,7 +15,7 @@ export function sortAdvice(recs: Recommendation[]): Recommendation[] {
 export function adviceLabel(rec: Recommendation): string {
   switch (rec.type) {
     case "SKILL_LEVEL":
-      return "Скилл";
+      return "Способность";
     case "TALENT":
       return "Талант";
     case "ITEM_NEXT":

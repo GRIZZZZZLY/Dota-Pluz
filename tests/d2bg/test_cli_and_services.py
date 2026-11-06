@@ -23,7 +23,7 @@ def test_cli_version_draft_build():
     assert r.exit_code == 0, r.output
     assert "Suggested picks" in r.stdout and "unknown heroes: xyzzy" in r.output
     b = runner.invoke(app, ["build", "invoker"])
-    assert b.exit_code == 0 and b.stdout.startswith("Invoker build")
+    assert b.exit_code == 0 and b.stdout.startswith("Invoker — сборка")
     assert runner.invoke(app, ["build", "qqqqqq"]).exit_code == 1
 
 
@@ -75,7 +75,7 @@ def test_hero_build_and_text(shared_ctx):
     assert all(o["median"].count(":") == 1 for o in b["items"]["order"])
     assert {t["level"] for t in b["skills"]["talents"]} <= {10, 15, 20, 25}
     text = build_text(b)
-    assert "Items:" in text and "Skills:" in text
+    assert "Предметы:" in text and "Способности:" in text
 
 
 def test_next_items_skips_owned_and_folded_parts(shared_ctx):

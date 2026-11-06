@@ -26,8 +26,8 @@ export const HeroPicker = forwardRef<HTMLInputElement, Props>(function HeroPicke
         className="input"
         style={{ width: "100%" }}
         value={query}
-        placeholder={placeholder ?? "Type a hero: am, qop, pudge… then Enter"}
-        aria-label="Search heroes"
+        placeholder={placeholder ?? "Введите героя: am, qop, pudge… и нажмите Enter"}
+        aria-label="Поиск героя"
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && firstFree) {

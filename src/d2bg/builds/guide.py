@@ -134,8 +134,8 @@ def hero_build(ctx: AppContext, hero_id: int) -> dict[str, Any]:
     notes = []
     if not pro or pro["n"] < MIN_ROWS:
         notes.append(
-            f"Only {pro['n'] if pro else 0} pro games on this hero since the patch; "
-            "the skill and item order may not be representative."
+            f"Про-матчей на этом герое с выхода патча: {pro['n'] if pro else 0}. "
+            "Порядок способностей и предметов может быть неточным."
         )
     return {
         "hero": hero.summary(),
@@ -205,17 +205,19 @@ def next_items(
 
 def build_text(build: Mapping[str, Any]) -> str:
     """Plain text to paste into chat or notes."""
-    lines = [f"{build['hero']['name']} build (pro games: {build['pro']['games']})"]
+    lines = [f"{build['hero']['name']} — сборка (про-матчей: {build['pro']['games']})"]
     if build["items"]["starting"]:
-        lines.append("Start: " + ", ".join(i["name"] for i in build["items"]["starting"][0]["items"]))
+        lines.append("Старт: " + ", ".join(i["name"] for i in build["items"]["starting"][0]["items"]))
     if build["items"]["order"]:
-        lines.append("Items: " + " > ".join(f"{i['name']} ({i['median']})" for i in build["items"]["order"]))
+        lines.append(
+            "Предметы: " + " > ".join(f"{i['name']} ({i['median']})" for i in build["items"]["order"])
+        )
     if build["skills"]["orders"]:
-        lines.append("Skills: " + " ".join(a["name"] for a in build["skills"]["orders"][0]["order"]))
+        lines.append("Способности: " + " ".join(a["name"] for a in build["skills"]["orders"][0]["order"]))
     picks: dict[int, Mapping[str, Any]] = {}
     for t in build["skills"]["talents"]:
         if t["share"] is not None and (t["level"] not in picks or t["share"] > picks[t["level"]]["share"]):
             picks[t["level"]] = t
     if picks:
-        lines.append("Talents: " + "; ".join(f"{lvl}: {t['name']}" for lvl, t in sorted(picks.items())))
+        lines.append("Таланты: " + "; ".join(f"{lvl}: {t['name']}" for lvl, t in sorted(picks.items())))
     return "\n".join(lines)

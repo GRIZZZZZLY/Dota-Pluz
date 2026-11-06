@@ -27,16 +27,16 @@ LOOPBACK = {"127.0.0.1", "::1", "localhost", "testclient"}
 async def gsi(request: Request, svc: Svc) -> dict[str, bool]:
     """Dota 2 posts here. Only from this machine, and only with this install's token."""
     if request.client is None or request.client.host not in LOOPBACK:
-        raise HTTPException(403, "GSI is accepted from this computer only")
+        raise HTTPException(403, "GSI принимается только с этого компьютера")
     try:
         payload = await request.json()
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise HTTPException(400, "body is not JSON") from exc
+        raise HTTPException(400, "Тело запроса не JSON") from exc
     if not isinstance(payload, dict):
-        raise HTTPException(400, "body is not an object")
+        raise HTTPException(400, "Тело запроса не JSON-объект")
     token = (payload.get("auth") or {}).get("token") if isinstance(payload.get("auth"), dict) else None
     if not isinstance(token, str) or not hmac.compare_digest(token, svc.ctx.settings.get().gsi_token):
-        raise HTTPException(403, "bad GSI token")
+        raise HTTPException(403, "Неверный токен GSI")
     if svc.player is not None and svc.player.running:
         return {"ok": True}  # a replay owns the live view; ignore the game until it stops
     svc.engine.ingest(payload, source="game")
@@ -120,7 +120,7 @@ def gsi_install(svc: Svc, body: InstallBody) -> dict[str, Any]:
     dota = _dota(body.path)
     if dota is None:
         raise HTTPException(
-            404, "Dota 2 not found. Enter the Dota 2 install folder (the one that contains game/dota)."
+            404, "Dota 2 не найдена. Укажите папку установки Dota 2 (ту, где есть game/dota)."
         )
     try:
         target = installer.install(dota, svc.port, svc.ctx.settings.get().gsi_token)
@@ -133,7 +133,7 @@ def gsi_install(svc: Svc, body: InstallBody) -> dict[str, Any]:
 def gsi_remove(svc: Svc, body: InstallBody) -> dict[str, Any]:
     dota = _dota(body.path)
     if dota is None:
-        raise HTTPException(404, "Dota 2 not found")
+        raise HTTPException(404, "Dota 2 не найдена")
     return {"removed": installer.remove(dota)}
 
 
@@ -155,7 +155,7 @@ def replay(svc: Svc, body: ReplayBody) -> dict[str, Any]:
     directory = paths.recordings_dir().resolve()
     target = (directory / body.name).resolve()
     if target.parent != directory or not target.is_file():
-        raise HTTPException(404, "No such recording")
+        raise HTTPException(404, "Такой записи нет")
     frames = list(recorder.read(target))
     svc.start_player(frames, "replay", body.speed)
     return {"frames": len(frames), "speed": body.speed}
@@ -170,7 +170,7 @@ class DemoBody(BaseModel):
 @router.post("/api/demo")
 def demo(svc: Svc, body: DemoBody) -> dict[str, Any]:
     if svc.ctx.data.heroes.get(body.hero) is None:
-        raise HTTPException(404, f"No hero {body.hero!r}")
+        raise HTTPException(404, f"Нет героя {body.hero!r}")
     frames = demo_frames(svc.ctx, body.hero, minutes=body.minutes)
     svc.start_player(frames, "demo", body.speed)
     return {"frames": len(frames), "speed": body.speed}

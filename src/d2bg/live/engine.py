@@ -57,14 +57,26 @@ NOTABLE_ITEMS = frozenset(
     }
 )
 PLAYER_NOTE = (
-    "Dota does not send a player the other picks during the draft (its GSI draft block stays empty), so "
-    "add allies and enemies by hand until the game loads. Your hero, your team and the bans fill in by "
-    "themselves; after loading, allies fill in from the minimap, and enemies as soon as you see them."
+    "Во время драфта Dota не передаёт игроку чужие пики (блок драфта в GSI остаётся пустым), поэтому "
+    "до загрузки игры добавляйте союзников и врагов вручную. Ваш герой, команда и баны заполняются сами; "
+    "после загрузки союзники появляются с миникарты, а враги — как только вы их увидите."
 )
-SPECTATOR_NOTE = "Spectating: Dota sends the whole draft, so both teams fill in by themselves."
+SPECTATOR_NOTE = "Режим зрителя: Dota передаёт весь драфт, обе команды заполняются сами."
+TEAM_RU = {"radiant": "Свет", "dire": "Тьма"}
 SERIES_EVERY = 30.0
 MAX_ALERTS = 60
 STALE_AFTER = 30.0
+
+
+def _in_seconds(n: int) -> str:
+    """For the voice: «через 1 секунду», «через 3 секунды», «через 15 секунд»."""
+    if n % 10 == 1 and n % 100 != 11:
+        word = "секунду"
+    elif 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        word = "секунды"
+    else:
+        word = "секунд"
+    return f"через {n} {word}"
 
 
 @dataclass
@@ -138,6 +150,9 @@ class LiveEngine:
         }
         self.own_hero: int | None = None
         self.draft_sources: dict[str, str] = {}
+        # Picks read from the draft screen (d2bg-cv) and his own corrections on the Draft page.
+        self.screen: dict[str, Any] | None = None
+        self.draft_manual: dict[str, list[int]] | None = None
 
     def reset(self) -> None:
         with self._lock:
@@ -200,7 +215,7 @@ class LiveEngine:
             t = e.game_time if e.game_time is not None else clock
             if e.subtype == "CHAT_MESSAGE_HERO_BANNED" and e.value and e.value not in self.draft_seen["bans"]:
                 self.draft_seen["bans"].append(e.value)
-                self.draft_sources["bans"] = "ban announcements in the game chat"
+                self.draft_sources["bans"] = "баны из объявлений в игровом чате"
             if e.type == "generic_event":
                 continue  # chat announcements (bans, purchases, kills) stay out of the event log
             self.event_log.append(
@@ -208,7 +223,7 @@ class LiveEngine:
             )
             if e.type == "roshan_killed" and t is not None:
                 self.timers.roshan_killed_at = t
-                self._alert(f"rosh:{t}", "event", f"Roshan killed at {fmt(t)}", "Roshan killed")
+                self._alert(f"rosh:{t}", "event", f"Рошан убит в {fmt(t)}", "Рошан убит")
             elif e.type == "aegis_picked_up" and t is not None:
                 self.timers.aegis_picked_at = t
             elif e.type == "aegis_denied" and t is not None:
@@ -235,8 +250,8 @@ class LiveEngine:
                         self._alert(
                             f"item:{p.team}:{p.slot}:{item_key}",
                             "item",
-                            f"{who} ({p.team}) has {name}",
-                            f"{who} bought {name}",
+                            f"У {who} ({TEAM_RU.get(p.team, p.team)}) теперь {name}",
+                            f"У {who} теперь {name}",
                         )
                 self._enemy_items[(p.team, p.slot)] = have
         else:
@@ -262,7 +277,11 @@ class LiveEngine:
         # Post-game.
         if s.phase == "post_game" and s.match_id and not self._post_game_sent:
             self._post_game_sent = True
-            self._alert(f"end:{s.match_id}", "event", "Match over. The review opens once OpenDota has it.")
+            self._alert(
+                f"end:{s.match_id}",
+                "event",
+                "Матч окончен. Разбор откроется, когда матч появится на OpenDota.",
+            )
             if self.on_post_game is not None and self.source == "game":
                 self.on_post_game(s.match_id)
 
@@ -281,7 +300,7 @@ class LiveEngine:
                     if self.own_hero in self.draft_seen[side]:
                         self.draft_seen[side].remove(self.own_hero)
             self.own_hero = s.hero.id
-            self.draft_sources["you"] = "your hero and team from the game"
+            self.draft_sources["you"] = "ваш герой и команда из игры"
         if s.phase not in ("pre_game", "in_game", "post_game") or s.team is None:
             return
         mine = 2 if s.team == "radiant" else 3
@@ -291,14 +310,56 @@ class LiveEngine:
                 continue
             if unit.team == mine and unit.image.startswith("minimap_herocircle"):
                 side = s.team
-                self.draft_sources["allies"] = "allies from the minimap after loading"
+                self.draft_sources["allies"] = "союзники с миникарты после загрузки"
             elif unit.team is not None and unit.team != mine and unit.image == "minimap_enemyicon":
                 side = their_side
-                self.draft_sources["enemies"] = "enemies from the minimap once you see them"
+                self.draft_sources["enemies"] = "враги с миникарты, когда вы их увидите"
             else:
                 continue
             if unit.hero_id not in self.draft_seen[side]:
                 self.draft_seen[side].append(unit.hero_id)
+
+    # ── draft from the screen and from his corrections ─────────────
+
+    def add_screen_draft(
+        self, radiant: list[int], dire: list[int], bans: list[int], unknown: int, confidence: float
+    ) -> bool:
+        """Picks d2bg-cv read on the draft screen. Like the game's own reports they only add heroes; a
+        slot it could not read stays unknown and is never guessed. False when no match is running."""
+        with self._lock:
+            if self.match_id is None:
+                return False
+            for side, heroes in (("radiant", radiant), ("dire", dire), ("bans", bans)):
+                for h in heroes:
+                    if h not in self.draft_seen[side]:
+                        self.draft_seen[side].append(h)
+            self.screen = {"unknown": unknown, "confidence": confidence}
+            self.draft_sources["screen"] = "пики, прочитанные с экрана драфта" + (
+                f"; не распознано: {unknown}, добавьте вручную" if unknown else ""
+            )
+            self.version += 1
+            self._cached = (self.version, self._build())
+            return True
+
+    def correct_draft(
+        self, allies: list[int], enemies: list[int], bans: list[int], removed: list[int]
+    ) -> bool:
+        """His board on the Draft page wins: heroes he placed stay, heroes he took off are dropped even if
+        the game or the screen reports them again. Heroes reported later still come in. False when no
+        match is running."""
+        with self._lock:
+            if self.match_id is None:
+                return False
+            self.draft_manual = {
+                "allies": list(allies),
+                "enemies": list(enemies),
+                "bans": list(bans),
+                "removed": sorted(set(removed) - {*allies, *enemies, *bans}),
+            }
+            self.draft_sources["manual"] = "ваши правки на странице Драфт"
+            self.version += 1
+            self._cached = (self.version, self._build())
+            return True
 
     # ── actions from the UI ────────────────────────────────────────
 
@@ -393,7 +454,7 @@ class LiveEngine:
                     f"timer:{v.id}:{v.at}",
                     "timer",
                     f"{v.label}: {v.detail}",
-                    f"{v.label} in {int(v.seconds_left)} seconds",
+                    f"{v.label}: {_in_seconds(int(v.seconds_left))}",
                 )
         out["timers"] = [v.as_dict() for v in timer_views]
 
@@ -462,8 +523,8 @@ class LiveEngine:
                 self._alert(
                     f"afford:{nxt[0]['item']}",
                     "item",
-                    f"You can buy {nxt[0]['name']} now",
-                    f"{nxt[0]['name']} ready to buy",
+                    f"Уже можно купить {nxt[0]['name']}",
+                    f"Можно купить {nxt[0]['name']}",
                 )
             bb = s.hero.buyback_cost
             if (
@@ -475,8 +536,8 @@ class LiveEngine:
                 and st.gold - nxt[0]["remaining"] < bb
             ):
                 out["buyback_warning"] = (
-                    f"Buying {nxt[0]['name']} leaves {st.gold - nxt[0]['remaining']} gold; "
-                    f"buyback costs {bb}."
+                    f"После покупки {nxt[0]['name']} останется {st.gold - nxt[0]['remaining']} золота, "
+                    f"а выкуп стоит {bb}."
                 )
             else:
                 out["buyback_warning"] = None
@@ -518,8 +579,8 @@ class LiveEngine:
                 self._alert(
                     f"skill:{s.hero.level}",
                     "skill",
-                    f"Skill point ready: pros take {out['skills']['next']['name']} next",
-                    f"Skill point: {out['skills']['next']['name']}",
+                    f"Есть очко способностей: про-игроки берут {out['skills']['next']['name']}",
+                    f"Очко способностей: {out['skills']['next']['name']}",
                 )
             # Benchmarks pace.
             bench = ctx.data.per_hero("benchmarks.json", hero.id)
@@ -549,6 +610,12 @@ class LiveEngine:
         for h in self.draft_seen["radiant_bans"] + self.draft_seen["dire_bans"] + self.draft_seen["bans"]:
             if h not in bans and h not in allies and h not in enemies:
                 bans.append(h)
+        if self.draft_manual:
+            m = self.draft_manual
+            gone = {*m["removed"], *m["allies"], *m["enemies"], *m["bans"]}
+            allies = m["allies"] + [h for h in allies if h not in gone]
+            enemies = m["enemies"] + [h for h in enemies if h not in gone]
+            bans = m["bans"] + [h for h in bans if h not in gone]
         out["draft"] = {
             "allies": allies[:5],
             "enemies": enemies[:5],
@@ -557,6 +624,7 @@ class LiveEngine:
             "bans": bans,
             "sources": dict(self.draft_sources),
             "note": SPECTATOR_NOTE if s.spectating else PLAYER_NOTE,
+            "screen": self.screen,
         }
         if enemies:
             out["situational_items"] = situational_items(

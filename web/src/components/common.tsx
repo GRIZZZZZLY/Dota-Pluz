@@ -40,7 +40,7 @@ export function HeroChip({ hero, size = 28, link = true, extra }: { hero: number
   const body = (
     <>
       <Portrait hero={hero} size={size} />
-      <span>{h?.name ?? `Hero ${hero}`}</span>
+      <span>{h?.name ?? `Герой ${hero}`}</span>
       {extra}
     </>
   );
@@ -134,7 +134,7 @@ export function LineChart({
   points: { t: number; [k: string]: number | null }[];
   series: { key: string; className: string }[];
 }) {
-  if (points.length < 2) return <p className="muted small">The chart fills in as the game goes on.</p>;
+  if (points.length < 2) return <p className="muted small">График заполняется по ходу игры.</p>;
   const w = 600;
   const h = 128;
   const t0 = points[0]!.t;
@@ -152,12 +152,12 @@ export function LineChart({
     return <path key={s.key} className={s.className} d={d} />;
   });
   return (
-    <svg className="chart" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="Gold and last hits over time">
+    <svg className="chart" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="Золото и ластхиты по ходу игры">
       {paths}
     </svg>
   );
 }
 
 export function Loading({ what }: { what: string }) {
-  return <p className="muted">Loading {what}…</p>;
+  return <p className="muted">Загрузка {what}…</p>;
 }

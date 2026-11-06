@@ -118,7 +118,7 @@ def config_path(dota: Path) -> Path:
 
 def install(dota: Path, port: int, token: str) -> Path:
     if not (dota / "game" / "dota").is_dir():
-        raise FileNotFoundError(f"{dota} does not look like a Dota 2 install (no game/dota folder)")
+        raise FileNotFoundError(f"{dota}: не похоже на папку Dota 2 (нет папки game/dota)")
     target = config_path(dota)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(render_config(port, token), encoding="utf-8")
