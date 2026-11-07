@@ -8,10 +8,12 @@ import time
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from d2bg.api.services import Services, services
-from d2bg.copilot import hud
+from d2bg.copilot import coach, hud
 from d2bg.copilot.models import DraftObservation, ManualDraft, RecStatus
+from d2bg.copilot.providers import ProviderError
 
 router = APIRouter(prefix="/api/copilot")
 Svc = Annotated[Services, Depends(services)]
@@ -130,6 +132,64 @@ def hud_hints(svc: Svc) -> dict[str, Any]:
     recs = svc.copilot.store.recommendations(match, 20, "suggested") if match else []
     mode, mode_source = svc.game_mode()
     return hud.build(svc.ctx, svc.engine, svc.ctx.settings.get(), recs, mode, mode_source)
+
+
+class SeenBody(BaseModel):
+    ids: list[str] = Field(max_length=50)
+
+
+@router.post("/recommendations/seen")
+def recommendations_seen(svc: Svc, body: SeenBody) -> dict[str, int]:
+    """The UI put this advice on his screen (the coach tells advice he saw from advice he never saw)."""
+    return {"marked": svc.copilot.store.mark_seen(body.ids, time.time())}
+
+
+@router.get("/matches")
+def journal_matches(svc: Svc, limit: Annotated[int, Query(ge=1, le=200)] = 30) -> list[dict[str, Any]]:
+    """His matches in the Copilot journal, newest first, with the reports each one has."""
+    out = []
+    for m in svc.copilot.store.matches(limit):
+        hero = svc.ctx.data.heroes.get(m["hero_id"]) if m.get("hero_id") else None
+        out.append({**m, "hero": hero.name if hero else None})
+    return out
+
+
+@router.get("/matches/{match_id}/review")
+def match_review(svc: Svc, match_id: str, rebuild: bool = False) -> dict[str, Any]:
+    """The coach's report (facts), the analyst's reading (ai, if any) and problems that keep coming back."""
+    if svc.copilot.store.match(match_id) is None and svc.copilot.store.report(match_id, "facts") is None:
+        raise HTTPException(404, "Этого матча нет в журнале Copilot")
+    return svc.review(match_id, rebuild=rebuild)
+
+
+@router.post("/matches/{match_id}/analyze")
+def match_analyze(request: Request, svc: Svc, match_id: str) -> dict[str, Any]:
+    """Ask the analyst again (by his button; it costs a fraction of a rouble)."""
+    if request.client is None or request.client.host not in LOOPBACK:
+        raise HTTPException(403, "Разбор через DeepSeek — только с этого компьютера")
+    if svc.copilot.store.match(match_id) is None:
+        raise HTTPException(404, "Этого матча нет в журнале Copilot")
+    try:
+        return svc.analyze(match_id)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ProviderError as exc:
+        raise HTTPException(502, f"DeepSeek: {exc.kind}: {exc}") from exc
+
+
+@router.get("/goals")
+def goals(svc: Svc) -> dict[str, Any]:
+    """His latest practice goals and the problems that came back in recent games."""
+    return {"goals": svc.copilot.store.goals(10), "recurring": coach.recurring(svc.copilot.store)}
+
+
+@router.delete("/history")
+def delete_history(request: Request, svc: Svc) -> dict[str, bool]:
+    """Forget every match, piece of advice, report and goal in the journal (recordings stay)."""
+    if request.client is None or request.client.host not in LOOPBACK:
+        raise HTTPException(403, "Удалить историю можно только с этого компьютера")
+    svc.copilot.store.delete_history()
+    return {"ok": True}
 
 
 @router.post("/recommendations/{rec_id}/dismiss")

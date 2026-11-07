@@ -9,12 +9,16 @@ import type {
   DraftResponse,
   GsiStatus,
   HeroDetail,
+  GoalsResponse,
   HeroListRow,
   Hud,
   ItemDetail,
   ItemRow,
+  JournalMatch,
   LiveSnapshot,
   MatchReview,
+  MatchReviewResponse,
+  AiReview,
   MetaResponse,
   Peer,
   ProviderTest,
@@ -158,5 +162,58 @@ export function useDismissAdvice() {
   return useMutation({
     mutationFn: (id: string) => api.post<{ ok: boolean }>(`/api/copilot/recommendations/${encodeURIComponent(id)}/dismiss`),
     onSettled: () => qc.invalidateQueries({ queryKey: ["copilot-advice"] }),
+  });
+}
+
+/** His games in the Copilot journal, newest first. */
+export const useJournalMatches = () =>
+  useQuery({ queryKey: ["journal-matches"], queryFn: () => api.get<JournalMatch[]>("/api/copilot/matches"), refetchInterval: 15000 });
+
+/** The coach's report for one match (built on first request, then stored). */
+export const useCoachReview = (matchId: string | null) =>
+  useQuery({
+    queryKey: ["coach-review", matchId],
+    queryFn: () => api.get<MatchReviewResponse>(`/api/copilot/matches/${encodeURIComponent(matchId ?? "")}/review`),
+    enabled: !!matchId,
+  });
+
+export function useRebuildReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (matchId: string) =>
+      api.get<MatchReviewResponse>(`/api/copilot/matches/${encodeURIComponent(matchId)}/review?rebuild=true`),
+    onSuccess: (data, matchId) => qc.setQueryData(["coach-review", matchId], data),
+  });
+}
+
+/** The analyst (DeepSeek) reads the report: by his button, a fraction of a rouble. */
+export function useAnalyzeMatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (matchId: string) => api.post<AiReview>(`/api/copilot/matches/${encodeURIComponent(matchId)}/analyze`),
+    onSettled: (_d, _e, matchId) => {
+      qc.invalidateQueries({ queryKey: ["coach-review", matchId] });
+      qc.invalidateQueries({ queryKey: ["goals"] });
+      qc.invalidateQueries({ queryKey: ["copilot-status"] });
+    },
+  });
+}
+
+export const useGoals = () => useQuery({ queryKey: ["goals"], queryFn: () => api.get<GoalsResponse>("/api/copilot/goals") });
+
+/** Tell the journal which advice was on his screen (the coach separates seen from unseen advice). */
+export function useMarkSeen(ids: string[]) {
+  const key = ids.join(",");
+  useEffect(() => {
+    if (ids.length) api.post("/api/copilot/recommendations/seen", { ids }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
+
+export function useDeleteHistory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.del<{ ok: boolean }>("/api/copilot/history"),
+    onSettled: () => qc.invalidateQueries(),
   });
 }

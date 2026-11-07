@@ -215,11 +215,14 @@ class Copilot:
         if hybrid is not None:
             hybrid.copilot = self
 
-    def _close_all(self) -> None:
-        for rec_id, _, _ in self._active.values():
-            self.store.set_status(rec_id, "expired")
-        for rec_id, _ in self._models.values():
-            self.store.set_status(rec_id, "expired")
+    def _close_all(self, events: list[CopilotEvent] | None = None) -> None:
+        """Close what is shown. At the end of a match, advice he carried out in the last packets is
+        ``followed``, not ``expired``."""
+        seen = events or []
+        for key, (rec_id, candidate, _) in self._active.items():
+            self.store.set_status(rec_id, _closing_status(key.split(":")[0], candidate, seen, False))
+        for key, (rec_id, candidate) in self._models.items():
+            self.store.set_status(rec_id, _closing_status(key.split(":")[0], candidate, seen, False))
         self._active.clear()
         self._models.clear()
 
@@ -265,7 +268,7 @@ class Copilot:
                 # Advice left open by an earlier run (the app was closed mid-match) is not current.
                 self.store.expire_open()
             elif any(e.type == "match_finished" for e in events):
-                self._close_all()
+                self._close_all(events)
             file, frame = recording or (None, None)
             self.store.upsert_match(cur, source, now, file)
             self.store.add_events(events, now, file, frame)

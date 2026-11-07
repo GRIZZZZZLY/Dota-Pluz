@@ -20,11 +20,17 @@ DELAYS = (60, 120, 180, 300, 480, 600, 900, 900, 1200, 1800)
 
 class PostGame:
     def __init__(
-        self, ctx: AppContext, sleep: Callable[[float], None] = time.sleep, delays: tuple[int, ...] = DELAYS
+        self,
+        ctx: AppContext,
+        sleep: Callable[[float], None] = time.sleep,
+        delays: tuple[int, ...] = DELAYS,
+        on_ready: Callable[[str], object] | None = None,
     ) -> None:
         self.ctx = ctx
         self._sleep = sleep
         self.delays = delays
+        # Called once OpenDota has the match (parsed, if a parse was requested): the coach rebuilds.
+        self.on_ready = on_ready
         self._lock = threading.Lock()
         self.jobs: dict[str, dict[str, Any]] = {}
 
@@ -62,12 +68,27 @@ class PostGame:
                 self._set(match_id, error=str(exc))
                 continue
             if isinstance(match, dict) and match.get("players") and match.get("duration"):
-                if settings.request_parse and not match.get("version"):
+                parsed = bool(match.get("version"))
+                if not parsed and settings.request_parse and not self.jobs[match_id]["parse_requested"]:
                     try:
                         self.ctx.client.post(f"request/{match_id}")
                         self._set(match_id, parse_requested=True)
                     except OpenDotaError as exc:
                         self._set(match_id, error=f"не удалось запросить разбор реплея: {exc}")
-                self._set(match_id, status="ready", error=None)
-                return
+                if parsed or not self.jobs[match_id]["parse_requested"]:
+                    self._set(match_id, status="ready", error=None)
+                    self._ready(match_id)
+                    return
+                self._set(match_id, status="parsing")  # keep polling until the parse lands
+        if self.jobs[match_id]["status"] == "parsing":
+            self._set(match_id, status="ready", error="OpenDota не успел разобрать запись")
+            self._ready(match_id)
+            return
         self._set(match_id, status="gave_up")
+
+    def _ready(self, match_id: str) -> None:
+        if self.on_ready is not None:
+            try:
+                self.on_ready(match_id)
+            except Exception as exc:  # the coach must not break the job list
+                self._set(match_id, error=f"разбор: {type(exc).__name__}: {exc}")

@@ -11,15 +11,18 @@ from typing import Any
 
 from fastapi import Request
 
-from d2bg import paths
+from d2bg import apikeys, paths
 from d2bg.context import AppContext
-from d2bg.copilot import hud
+from d2bg.copilot import analyst, coach, hud
 from d2bg.copilot.hybrid import Hybrid
 from d2bg.copilot.pipeline import Copilot
+from d2bg.copilot.providers import AdvisorClient, Call, ProviderError
 from d2bg.copilot.store import CopilotStore
 from d2bg.gsi.recorder import Player, Recorder
 from d2bg.live.engine import LiveEngine
 from d2bg.matches.postgame import PostGame
+from d2bg.matches.review import is_parsed
+from d2bg.opendota import OpenDotaError
 
 
 @dataclass
@@ -37,7 +40,8 @@ class Services:
         self.port = port
         self.lock = threading.Lock()
         self.recorder = Recorder(paths.recordings_dir(), keep=ctx.settings.get().keep_recordings)
-        self.postgame = PostGame(ctx)
+        # Once OpenDota has the match, the coach's report is rebuilt with it (no new AI call).
+        self.postgame = PostGame(ctx, on_ready=lambda match_id: self.review(match_id, rebuild=True))
         self.player: Player | None = None
         self.refresh = RefreshJob()
         store = CopilotStore(paths.copilot_db_file())
@@ -61,6 +65,78 @@ class Services:
     def _post_game(self, match_id: str) -> None:
         if self.ctx.settings.get().auto_post_game:
             self.postgame.start(match_id)
+        if self.engine.source == "game":
+            threading.Thread(target=self._coach, args=(match_id,), name="coach", daemon=True).start()
+
+    def _coach(self, match_id: str) -> None:
+        """Right after a real game: the coach's report, then the analyst's reading if he allows it."""
+        time.sleep(5)  # let the last packets close the match's advice in the journal first
+        try:
+            self.review(match_id, rebuild=True, fetch=False)
+            prefs = self.ctx.settings.get().providers
+            if prefs.postmatch_ai and prefs.mode != "baseline" and apikeys.configured(apikeys.ADVISOR_KEY):
+                self.analyze(match_id)
+        except Exception as exc:  # the coach is an add-on; the live view never depends on it
+            self.copilot_error = f"coach: {type(exc).__name__}: {exc}"
+
+    def opendota_match(self, match_id: str) -> dict[str, Any] | None:
+        """OpenDota's document for a public match, or None (lobby, private, not there yet, offline). An
+        unparsed document is asked for again after five minutes rather than an hour."""
+        if not match_id.isdigit() or match_id == "0":
+            return None
+        try:
+            doc = self.ctx.client.get(f"matches/{match_id}", ttl=3600)
+            if isinstance(doc, dict) and doc.get("players") and not is_parsed(doc):
+                doc = self.ctx.client.get(f"matches/{match_id}", ttl=300)
+        except OpenDotaError:
+            return None
+        return doc if isinstance(doc, dict) and doc.get("players") else None
+
+    def review(self, match_id: str, rebuild: bool = False, fetch: bool = True) -> dict[str, Any]:
+        """The coach's report for ``match_id``: stored once, rebuilt on request (after OpenDota parsed it)."""
+        facts = None if rebuild else self.copilot.store.report(match_id, "facts")
+        if facts is None:
+            doc = self.opendota_match(match_id) if fetch else None
+            facts = coach.build(
+                self.ctx,
+                self.copilot.store,
+                match_id,
+                paths.recordings_dir(),
+                opendota=doc,
+                account_id=self.ctx.settings.get().account_id,
+            )
+            self.copilot.store.save_report(match_id, "facts", time.time(), coach.REPORT_VERSION, facts)
+            self.copilot.store.save_goals(match_id, time.time(), facts["goals"], "coach")
+            facts = self.copilot.store.report(match_id, "facts")
+        return {
+            "facts": facts,
+            "ai": self.copilot.store.report(match_id, "ai"),
+            "recurring": coach.recurring(self.copilot.store),
+        }
+
+    def analyze(self, match_id: str) -> dict[str, Any]:
+        """The analyst reads the stored report (one call, a fraction of a rouble)."""
+        prefs = self.ctx.settings.get().providers
+        key = apikeys.key(apikeys.ADVISOR_KEY)
+        if key is None:
+            raise RuntimeError(f"Нет ключа {apikeys.ADVISOR_KEY} в .env")
+        facts = self.review(match_id)["facts"]
+        client = AdvisorClient(
+            key, prefs.advisor_base_url, prefs.analyst_model, timeout=240.0, reasoning=prefs.advisor_reasoning
+        )
+        try:
+            ai, call = analyst.analyze(facts, client)
+        except ProviderError as exc:
+            call = exc.call or Call("advisor", prefs.analyst_model)
+            call.status, call.error = exc.kind, str(exc)[:200]
+            self.copilot.store.add_provider_call(match_id, time.time(), call.as_row("postmatch"))
+            raise
+        self.copilot.store.add_provider_call(match_id, time.time(), call.as_row("postmatch"))
+        self.copilot.store.save_report(match_id, "ai", time.time(), ai["model_version"], ai)
+        self.copilot.store.save_goals(
+            match_id, time.time(), [{"text": g} for g in ai["practice_goals"]], "ai"
+        )
+        return ai
 
     def _account(self, account_id: int) -> None:
         self.ctx.settings.set_account_if_missing(account_id)

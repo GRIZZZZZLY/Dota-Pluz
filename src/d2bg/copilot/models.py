@@ -120,6 +120,8 @@ class Recommendation(BaseModel):
     data_patch: str | None = None
     status: RecStatus = "suggested"
     expires_at: float | None = None
+    # When the UI first showed it (stage 5 tells advice he saw from advice he never saw).
+    seen_at: float | None = None
 
 
 class SlotReading(BaseModel):

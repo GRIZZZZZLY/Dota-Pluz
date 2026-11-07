@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError
+
+M = TypeVar("M", bound=BaseModel)
 
 JEV_URL = "https://api.typesafe.ai/v1/systemone"
 # USD per million tokens (input, output), as published on 2026-11-07. Edit here when prices change.
@@ -163,7 +166,13 @@ class AdvisorClient:
     """An OpenAI-compatible chat model asked for a JSON answer: which candidate, and why, in Russian."""
 
     def __init__(
-        self, key: str, base_url: str, model: str, timeout: float = 40.0, http: httpx.Client | None = None
+        self,
+        key: str,
+        base_url: str,
+        model: str,
+        timeout: float = 40.0,
+        http: httpx.Client | None = None,
+        reasoning: bool = False,
     ):
         self.key, self.url, self.model, self.timeout = (
             key,
@@ -172,35 +181,48 @@ class AdvisorClient:
             timeout,
         )
         self.http = http or httpx.Client()
+        # DeepSeek V4 on ForgetAPI thinks at length by default (24,000 characters before a 2,600-character
+        # answer, measured) and runs out of tokens; switched off unless asked for.
+        self.extra: dict[str, Any] = {} if reasoning else {"reasoning": {"enabled": False}}
 
     def advise(
         self, system: str, facts: dict[str, Any], options: dict[str, str]
     ) -> tuple[AdvisorAnswer, Call]:
+        def check(answer: AdvisorAnswer) -> str | None:
+            return None if answer.choice in options else f"choice должен быть одним из {list(options)}"
+
+        return self.ask_json(system, {**facts, "options": options}, AdvisorAnswer, check)
+
+    def ask_json(
+        self,
+        system: str,
+        payload: dict[str, Any],
+        schema: type[M],
+        check: Callable[[M], str | None] = lambda _: None,
+        max_tokens: int = 1200,
+    ) -> tuple[M, Call]:
+        """Ask for a JSON answer matching ``schema`` and passing ``check``; one controlled retry that
+        tells the model what was wrong. Anything else is a bad_response."""
         call = Call("advisor", self.model)
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system},
-            {"role": "user", "content": json.dumps({**facts, "options": options}, ensure_ascii=False)},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ]
         problem = ""
-        for _ in range(2):  # one controlled retry when the answer is not what was asked
+        for _ in range(2):
             if problem:
                 messages.append(
                     {"role": "user", "content": f"Ответ не подошёл: {problem}. Ответь только JSON."}
                 )
+            body = {
+                "model": self.model,
+                "messages": messages,
+                "response_format": {"type": "json_object"},
+                "max_tokens": max_tokens,
+                **self.extra,
+            }
             try:
-                doc = _post(
-                    self.http,
-                    self.url,
-                    self.key,
-                    {
-                        "model": self.model,
-                        "messages": messages,
-                        "response_format": {"type": "json_object"},
-                        "max_tokens": 1200,
-                    },
-                    self.timeout,
-                    call,
-                )
+                doc = _post(self.http, self.url, self.key, body, self.timeout, call)
             except ProviderError as exc:
                 exc.call = call
                 raise
@@ -209,16 +231,17 @@ class AdvisorClient:
             call.output_tokens += int(usage.get("completion_tokens", 0))
             content = ((doc.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
             try:
-                answer = AdvisorAnswer.model_validate_json(content)
-            except ValidationError:
-                problem = "нужен JSON с полями choice и reason_ru"
+                answer = schema.model_validate_json(content)
+            except ValidationError as exc:
+                problem = f"JSON не по схеме: {exc.errors()[0].get('loc')} {exc.errors()[0].get('msg')}"
                 messages.append({"role": "assistant", "content": content[:500]})
                 continue
-            if answer.choice not in options:
-                problem = f"choice должен быть одним из {list(options)}"
+            why = check(answer)
+            if why:
+                problem = why
                 messages.append({"role": "assistant", "content": content[:500]})
                 continue
             return answer, call
-        error = ProviderError("bad_response", problem)
+        error = ProviderError("bad_response", problem or "пустой ответ")
         error.call = call
         raise error

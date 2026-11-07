@@ -130,7 +130,8 @@ class FlakyClient:
         if self.misses:
             self.misses -= 1
             raise NotFoundError(path)
-        return {"players": [{}], "duration": 2000}
+        # OpenDota parses the replay once asked: the next poll sees "version".
+        return {"players": [{}], "duration": 2000, **({"version": 21} if self.posts else {})}
 
     def post(self, path, params=None):
         self.posts.append(path)
@@ -140,7 +141,8 @@ class FlakyClient:
 def test_postgame_polls_until_ready_and_requests_parse(ctx):
     ctx._client = FlakyClient(misses=2)
     ctx.settings.update({"request_parse": True})
-    pg = PostGame(ctx, sleep=lambda s: None, delays=(1, 1, 1, 1))
+    ready = []
+    pg = PostGame(ctx, sleep=lambda s: None, delays=(1, 1, 1, 1, 1), on_ready=ready.append)
     pg.jobs["7"] = {
         "match_id": "7",
         "status": "waiting",
@@ -150,8 +152,9 @@ def test_postgame_polls_until_ready_and_requests_parse(ctx):
     }
     pg._run("7")
     job = pg.status()[0]
-    assert job["status"] == "ready" and job["attempts"] == 3 and job["parse_requested"]
-    assert ctx._client.posts == ["request/7"]
+    # Found unparsed on the 3rd try, parse requested, parsed on the 4th: ready, and the coach is told once.
+    assert job["status"] == "ready" and job["attempts"] == 4 and job["parse_requested"]
+    assert ctx._client.posts == ["request/7"] and ready == ["7"]
 
 
 def test_postgame_gives_up(ctx):

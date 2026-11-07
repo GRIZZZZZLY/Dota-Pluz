@@ -1,4 +1,4 @@
-import { useCopilotAdvice, useCopilotStatus, useDismissAdvice } from "../api/hooks";
+import { useCopilotAdvice, useCopilotStatus, useDismissAdvice, useMarkSeen } from "../api/hooks";
 import type { LiveSnapshot, Providers, Recommendation } from "../api/types";
 import { adviceLabel, dataState, quickbuyHint, sortAdvice } from "../lib/copilot";
 import { clock, gold } from "../lib/format";
@@ -14,6 +14,7 @@ export function CopilotPanel({ snap }: { snap: LiveSnapshot }) {
   const abilityName = new Map((snap.skills?.abilities ?? []).map((a) => [a.key, a.name]));
   // Cloud models' opinions sit under the rules' advice of the same kind, not as cards of their own.
   const shown = sortAdvice((advice ?? []).filter((r) => r.source === "baseline"));
+  useMarkSeen(shown.map((r) => r.id));
   const opinions = new Map(
     (advice ?? []).filter((r) => r.source !== "baseline").map((r) => [`${r.type}:${r.category ?? ""}`, r]),
   );

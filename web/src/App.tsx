@@ -11,6 +11,7 @@ import { LivePage } from "./pages/Live";
 import { MatchPage } from "./pages/Match";
 import { MetaPage } from "./pages/Meta";
 import { ProfilePage } from "./pages/Profile";
+import { ReviewPage } from "./pages/Review";
 import { SettingsPage } from "./pages/Settings";
 import { SetupPage } from "./pages/Setup";
 
@@ -22,6 +23,7 @@ const NAV = [
   { to: "/meta", label: "Мета", key: "5" },
   { to: "/profile", label: "Профиль", key: "6" },
   { to: "/match", label: "Матчи", key: "7" },
+  { to: "/review", label: "Разбор", key: "0" },
   { to: "/setup", label: "Подключение", key: "8" },
   { to: "/settings", label: "Настройки", key: "9" },
 ] as const;
@@ -30,7 +32,7 @@ function Shortcuts({ onClose }: { onClose: () => void }) {
   return (
     <div className="panel kbd-help" role="dialog" aria-label="Горячие клавиши">
       <h3>Горячие клавиши</h3>
-      <p className="small">1–9 переключают страницы. В драфте: / поиск, Enter добавить, Tab сменить команду, B бан, Backspace отменить. На странице «Матч»: R Рошан убит, T Tormentor убит, A Аегис взят. ? показывает эту подсказку.</p>
+      <p className="small">1–9 и 0 переключают страницы. В драфте: / поиск, Enter добавить, Tab сменить команду, B бан, Backspace отменить. На странице «Матч»: R Рошан убит, T Tormentor убит, A Аегис взят. ? показывает эту подсказку.</p>
       <button className="btn" type="button" onClick={onClose}>
         Закрыть
       </button>
@@ -90,6 +92,8 @@ export function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/match" element={<MatchPage />} />
           <Route path="/match/:id" element={<MatchPage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/review/:id" element={<ReviewPage />} />
           <Route path="/setup" element={<SetupPage live={live.snap} />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<p>Здесь ничего нет. Выберите страницу слева.</p>} />

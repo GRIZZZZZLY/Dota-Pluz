@@ -71,6 +71,7 @@ ignore = ["PLR0913", "PLR0917", "PLR2004", "S101", "S311", "E501", "PLR0912", "P
 "src/d2bg_overlay/*.py" = ["RUF001"]
 "tests/d2bg/test_cv.py" = ["RUF001"]
 "tests/d2bg/test_copilot.py" = ["RUF001"]
+"tests/d2bg/test_coach.py" = ["RUF001"]
 # The interface is in Russian: texts sent to the UI are Cyrillic on purpose.
 "src/d2bg/api/**" = ["RUF001"]
 "src/d2bg/builds/guide.py" = ["RUF001"]

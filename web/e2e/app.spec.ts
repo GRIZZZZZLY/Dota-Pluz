@@ -131,3 +131,13 @@ test("the draft board sends his corrections to the Copilot during a match", asyn
   await expect.poll(draftSource, { timeout: 10_000 }).toBe("manual");
   await request.post("/api/live/reset");
 });
+
+test("the review page explains what it compares and works with an empty journal", async ({ page }) => {
+  await page.goto("/review");
+  await expect(page.getByRole("heading", { name: "Разбор матчей" })).toBeVisible();
+  await expect(page.getByText("Пока нет игр в журнале")).toBeVisible();
+  await page.keyboard.press("1");
+  await expect(page).toHaveURL(/\/$/);
+  await page.keyboard.press("0");
+  await expect(page).toHaveURL(/\/review$/);
+});

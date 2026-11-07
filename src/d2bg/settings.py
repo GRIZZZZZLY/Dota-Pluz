@@ -45,6 +45,12 @@ class ProviderPrefs(BaseModel):
     advisor_model: str = "deepseek-v4-flash"
     # Demo matches and replays spend no money unless he asks for it.
     in_demo: bool = False
+    # After each real game: the analyst reads the coach's report (about 0.1 ₽ a game).
+    postmatch_ai: bool = True
+    analyst_model: str = "deepseek-v4-flash"
+    # Let the advisor model "think" before answering: slower and pricier, rarely better for these short
+    # answers. Off sends {"reasoning": {"enabled": false}} (ForgetAPI's switch).
+    advisor_reasoning: bool = False
 
 
 class Settings(BaseModel):

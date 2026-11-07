@@ -104,6 +104,29 @@ MIGRATIONS = [
     );
     CREATE INDEX provider_calls_by_match ON provider_calls(match_id, provider);
     """,
+    # 5: the post-match coach, stage 5. A report per match and kind (facts: the deterministic report;
+    # ai: the analyst's reading of it), the practice goals drawn from them, and when a piece of advice
+    # was on his screen.
+    """
+    ALTER TABLE recommendations ADD COLUMN seen_at REAL;
+    CREATE TABLE postmatch_reports (
+        match_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        model_version TEXT NOT NULL,
+        data TEXT NOT NULL,
+        PRIMARY KEY (match_id, kind)
+    );
+    CREATE TABLE practice_goals (
+        id INTEGER PRIMARY KEY,
+        match_id TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        metric TEXT,
+        text TEXT NOT NULL,
+        source TEXT NOT NULL,
+        UNIQUE (match_id, text)
+    );
+    """,
 ]
 _JSON_FIELDS = ("alternatives", "evidence_ids")
 
@@ -311,11 +334,103 @@ class CopilotStore:
     def events(self, match_id: str) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._db.execute(
-                "SELECT game_time_s, type, detail, recording, frame FROM gsi_events_index "
+                "SELECT id, game_time_s, type, detail, recording, frame FROM gsi_events_index "
                 "WHERE match_id = ? ORDER BY id",
                 (match_id,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def mark_seen(self, rec_ids: list[str], now: float) -> int:
+        """The UI showed these pieces of advice; the first time counts."""
+        with self._lock, self._db:
+            cur = self._db.executemany(
+                "UPDATE recommendations SET seen_at = ? WHERE id = ? AND seen_at IS NULL",
+                [(now, i) for i in rec_ids],
+            )
+            return int(cur.rowcount)
+
+    def match(self, match_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._db.execute("SELECT * FROM matches WHERE match_id = ?", (match_id,)).fetchone()
+        return dict(row) if row else None
+
+    def matches(self, limit: int = 30) -> list[dict[str, Any]]:
+        """His latest matches in the journal, newest first, with whether each has a report."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT m.*, (SELECT GROUP_CONCAT(kind) FROM postmatch_reports r WHERE r.match_id = m.match_id) "
+                "AS reports FROM matches m ORDER BY last_seen_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [{**dict(r), "reports": (r["reports"] or "").split(",") if r["reports"] else []} for r in rows]
+
+    def save_report(
+        self, match_id: str, kind: str, now: float, model_version: str, data: dict[str, Any]
+    ) -> None:
+        """One report per match and kind: running the analysis again replaces it, never duplicates it."""
+        with self._lock, self._db:
+            self._db.execute(
+                "INSERT INTO postmatch_reports (match_id, kind, created_at, model_version, data) VALUES (?,?,?,?,?) "
+                "ON CONFLICT(match_id, kind) DO UPDATE SET created_at = excluded.created_at, "
+                "model_version = excluded.model_version, data = excluded.data",
+                (match_id, kind, now, model_version, json.dumps(data, ensure_ascii=False)),
+            )
+
+    def report(self, match_id: str, kind: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT created_at, model_version, data FROM postmatch_reports WHERE match_id = ? AND kind = ?",
+                (match_id, kind),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            **json.loads(row["data"]),
+            "created_at": row["created_at"],
+            "model_version": row["model_version"],
+        }
+
+    def recent_reports(self, kind: str, limit: int) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT data FROM postmatch_reports WHERE kind = ? ORDER BY created_at DESC LIMIT ?",
+                (kind, limit),
+            ).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def save_goals(self, match_id: str, now: float, goals: list[dict[str, Any]], source: str) -> None:
+        """At most three goals per match and source; a new analysis replaces that source's goals."""
+        with self._lock, self._db:
+            self._db.execute(
+                "DELETE FROM practice_goals WHERE match_id = ? AND source = ?", (match_id, source)
+            )
+            self._db.executemany(
+                "INSERT OR IGNORE INTO practice_goals (match_id, created_at, metric, text, source) VALUES (?,?,?,?,?)",
+                [(match_id, now, g.get("metric"), g["text"], source) for g in goals[:3]],
+            )
+
+    def goals(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT match_id, created_at, metric, text, source FROM practice_goals ORDER BY created_at DESC, id "
+                "LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_history(self) -> None:
+        """Everything the journal holds about his matches; the schema stays."""
+        with self._lock, self._db:
+            for table in (
+                "practice_goals",
+                "postmatch_reports",
+                "provider_calls",
+                "draft_observations",
+                "recommendations",
+                "gsi_events_index",
+                "matches",
+            ):
+                self._db.execute(f"DELETE FROM {table}")  # noqa: S608 - fixed table names
 
     def counts(self) -> dict[str, int]:
         with self._lock:

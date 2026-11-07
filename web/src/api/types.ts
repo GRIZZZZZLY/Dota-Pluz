@@ -619,3 +619,89 @@ export interface Hud {
   } | null;
   items: { title: string; note: string; items: HudItem[] } | null;
 }
+
+/** A match in the Copilot journal (his own games the app saw). */
+export interface JournalMatch {
+  match_id: string;
+  source: string;
+  hero_id: number | null;
+  hero: string | null;
+  team: string | null;
+  first_seen_at: number;
+  last_seen_at: number;
+  last_game_time_s: number | null;
+  recording: string | null;
+  reports: string[];
+}
+
+export type Certainty = "verified" | "likely" | "insufficient_data";
+
+export interface CoachFinding {
+  id: string;
+  metric: string;
+  title: string;
+  event_time_s: number | null;
+  actual: unknown;
+  baseline: unknown;
+  comparison_group: string;
+  evidence_ids: string[];
+  certainty: Certainty;
+  review_anchor: string | null;
+  recommendation: string;
+  goal: string | null;
+}
+
+export interface CoachReport {
+  match_id: string;
+  hero: string | null;
+  hero_id: number | null;
+  mode: "turbo" | "normal" | null;
+  duration_s: number | null;
+  won: boolean | null;
+  stats: { kills: number; deaths: number; assists: number; last_hits: number; gpm: number; xpm: number; level: number | null } | null;
+  findings: CoachFinding[];
+  strengths: string[];
+  goals: { metric: string; text: string }[];
+  advice: {
+    /** One line per piece of advice and what became of it. */
+    outcomes: { type: string; candidate: string; name: string; first_t: string; times_shown: number; outcome: string; evidence: string }[];
+    total: number;
+    by_status: Record<string, number>;
+    seen: number;
+    models: { total: number; agreed: number };
+    items: { id: string; t: number | null; type: string; candidate: string; name: string; status: string; source: string }[];
+  };
+  timeline: { t: number | null; kind: "death" | "item"; text: string; id: string }[];
+  opendota: { parsed: boolean; me: unknown } | null;
+  missing: string[];
+  created_at: number;
+}
+
+export interface AiReview {
+  summary: string;
+  strengths: string[];
+  findings: { text: string; evidence_ids: string[]; certainty: Certainty }[];
+  practice_goals: string[];
+  unknowns: string[];
+  blocked_findings: number;
+  model_version: string;
+  created_at?: number;
+}
+
+export interface Recurring {
+  metric: string;
+  title: string;
+  matches: number;
+  of: number;
+}
+
+export interface MatchReviewResponse {
+  facts: CoachReport;
+  ai: AiReview | null;
+  recurring: Recurring[];
+}
+
+export interface GoalsResponse {
+  goals: { match_id: string; created_at: number; metric: string | null; text: string; source: string }[];
+  recurring: Recurring[];
+}

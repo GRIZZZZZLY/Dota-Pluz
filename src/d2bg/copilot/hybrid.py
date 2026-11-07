@@ -141,7 +141,13 @@ class Hybrid:
     def _advisor(self) -> AdvisorClient | None:
         k = apikeys.key(apikeys.ADVISOR_KEY)
         p = self.app.settings.get().providers
-        return AdvisorClient(k, p.advisor_base_url, p.advisor_model, http=self.http) if k else None
+        return (
+            AdvisorClient(
+                k, p.advisor_base_url, p.advisor_model, http=self.http, reasoning=p.advisor_reasoning
+            )
+            if k
+            else None
+        )
 
     def _ready(self, provider: str, match_id: str, limit: int) -> bool:
         if self.health[provider]["rest_until"] > self._clock():

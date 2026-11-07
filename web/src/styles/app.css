@@ -1261,3 +1261,20 @@ html:has(.hud) body {
   border-left: 2px solid var(--river);
   padding-left: 0.4rem;
 }
+
+.match-row {
+  width: 100%;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.match-row:hover,
+.match-row.active {
+  border-color: var(--line);
+  background: var(--slate-2);
+}
