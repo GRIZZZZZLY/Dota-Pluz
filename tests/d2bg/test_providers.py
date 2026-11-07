@@ -292,3 +292,42 @@ def test_a_weak_disagreement_is_noted_but_not_explained(ctx, tmp_path, payloads,
         advisor = mock.post(ADVISOR_URL)
         store, _, _ = play(ctx, tmp_path, payloads)
     assert advisor.call_count == 0 and rows(store, "jev") and not rows(store, "hybrid")
+
+
+def test_hidden_hints_cost_nothing(ctx, tmp_path, payloads, keys):
+    ctx.settings.update({"hidden_hints": ["items", "skills"]})
+    with respx.mock(assert_all_called=False) as mock:
+        jev = mock.post(JEV_URL).mock(side_effect=jev_picks(0))
+        store, _, _ = play(ctx, tmp_path, payloads)
+    assert jev.call_count == 0 and rows(store, "baseline")  # still journaled for the coach
+
+
+def test_diagnostics_hold_no_secrets(ctx, tmp_path, monkeypatch, keys):
+    from pathlib import Path
+
+    fake_home = tmp_path / "Users" / "someone"
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.setenv("D2BG_HOME", str(fake_home / "d2bg"))
+    ctx.settings.update({"opendota_api_key": "od-secret-123456"})
+    with TestClient(create_app(ctx, static_dir=tmp_path / "no-ui")) as client:
+        r = client.get("/api/copilot/diagnostics")
+    s = ctx.settings.get()
+    assert r.status_code == 200 and r.json()["app_version"]
+    for secret in (
+        s.gsi_token,
+        s.lan_token,
+        "od-secret-123456",
+        JEV_SECRET,
+        ADVISOR_SECRET,
+        str(Path.home()),
+    ):
+        assert secret not in r.text
+    assert r.json()["copilot"]["providers"]["jev"]["configured"] is True
+
+
+def test_keys_are_found_next_to_the_exe(tmp_path, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "d2bg.exe"))
+    assert apikeys.env_files()[0] == tmp_path / ".env"

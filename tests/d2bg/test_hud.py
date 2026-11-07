@@ -98,3 +98,15 @@ def test_a_real_lobby_game_shows_each_hint_in_its_phase(client, ctx):
     assert svc.mode_file.read_text(encoding="utf-8") == "turbo"
     ctx.settings.update({"game_mode": "normal"})
     assert svc.game_mode() == ("normal", "setting")
+
+
+def test_hidden_hint_groups_stay_hidden(client, ctx):
+    svc = client.app.state.services
+    ctx.settings.update({"hidden_hints": ["draft", "items", "skills"]})
+    shown = set()
+    for i, (_, payload) in enumerate(recorder.read(FIXTURES / "player_lobby_largo.jsonl.gz")):
+        svc.engine.ingest(payload, source="game")
+        if i % 5 == 0:
+            body = client.get("/api/copilot/hud").json()
+            shown |= {k for k in ("skill", "draft", "items") if body[k]}
+    assert shown == set()

@@ -364,6 +364,7 @@ export interface Settings {
   turbo_collect: boolean;
   game_mode: "auto" | "turbo" | "normal";
   providers: ProviderPrefs;
+  hidden_hints: HintGroup[];
   request_parse: boolean;
   lan_mode: boolean;
   theme: "dark" | "light";
@@ -705,3 +706,5 @@ export interface GoalsResponse {
   goals: { match_id: string; created_at: number; metric: string | null; text: string; source: string }[];
   recurring: Recurring[];
 }
+
+export type HintGroup = "skills" | "items" | "buyback" | "draft";

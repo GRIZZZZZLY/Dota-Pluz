@@ -5,6 +5,7 @@ one to the API: callers ask ``configured()``."""
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from d2bg import paths
@@ -15,7 +16,14 @@ KEYS = (JEV_KEY, ADVISOR_KEY)
 
 
 def env_files() -> list[Path]:
-    return [Path.cwd() / ".env", Path(__file__).resolve().parents[2] / ".env", paths.user_dir() / ".env"]
+    """Next to d2bg.exe (the single-file build), the working folder, the project, the user folder."""
+    exe = [Path(sys.executable).parent / ".env"] if getattr(sys, "frozen", False) else []
+    return [
+        *exe,
+        Path.cwd() / ".env",
+        Path(__file__).resolve().parents[2] / ".env",
+        paths.user_dir() / ".env",
+    ]
 
 
 def load_env(files: list[Path] | None = None) -> None:

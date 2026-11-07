@@ -72,6 +72,9 @@ class Settings(BaseModel):
     # the game mode) and otherwise keeps the last game's mode.
     game_mode: Literal["auto", "turbo", "normal"] = "auto"
     providers: ProviderPrefs = Field(default_factory=ProviderPrefs)
+    # Hint groups he switched off: hidden on the Copilot panel and the overlay, and never sent to a
+    # cloud model. The journal still records them for the post-match coach.
+    hidden_hints: list[Literal["skills", "items", "buyback", "draft"]] = Field(default_factory=list)
     request_parse: bool = False
     lan_mode: bool = False
     theme: Literal["dark", "light"] = "dark"

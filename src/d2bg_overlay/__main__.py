@@ -9,6 +9,9 @@ from d2bg_overlay.app import Overlay
 
 
 def main() -> None:  # pragma: no cover - opens windows
+    for stream in (sys.stdout, sys.stderr):  # a cp1251 console lacks ⚙ and 🖥: replace, never crash
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     server = args[0] if args else "http://127.0.0.1:4242"
     print("Подсказки d2bg поверх Dota. Dota должна быть в режиме «Окно без рамки».")

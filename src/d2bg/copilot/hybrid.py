@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from d2bg.copilot.pipeline import Copilot
 
 SUPPORTED = ("ITEM_NEXT", "ITEM_SITUATIONAL", "TALENT")
+HINT_GROUP = {"ITEM_NEXT": "items", "ITEM_SITUATIONAL": "items", "TALENT": "skills"}
 # A disagreement weaker than this is noted but not worth the advisor's time (live: Jev at 28-30% on
 # starting items was a coin toss).
 CONFLICT_CONFIDENCE = 0.5
@@ -176,6 +177,8 @@ class Hybrid:
             return
         if job.source != "game" and not prefs.in_demo:
             return
+        if HINT_GROUP.get(job.rec.type) in self.app.settings.get().hidden_hints:
+            return  # he switched this kind of hint off: no money spent on it
         rec, match = job.rec, job.rec.match_id
         if not copilot.is_current(job.key, rec.id):
             return  # the game moved on before the queue reached this advice

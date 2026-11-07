@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { useCopilotStatus, useHeroes, useSaveSettings, useSettings, useTestProviders, useVersion } from "../api/hooks";
-import type { CloudProvider, Settings } from "../api/types";
+import { useState as useLocalState } from "react";
+import { useCopilotStatus, useDeleteHistory, useHeroes, useSaveSettings, useSettings, useTestProviders, useVersion } from "../api/hooks";
+import type { CloudProvider, HintGroup, Settings } from "../api/types";
 import { ErrorBox, HeroChip, Loading, Segmented } from "../components/common";
 import { HeroPicker } from "../components/HeroPicker";
 import { BUCKETS } from "../lib/format";
@@ -150,6 +151,8 @@ export function SettingsPage() {
             <p className="small muted">Повышает лимиты OpenDota. Создайте ключ сами на opendota.com; он хранится только на этом компьютере.</p>
           </div>
           <CloudModels settings={settings} set={set} />
+          <Hints settings={settings} set={set} />
+          <History />
           <div>
             <h3>Оформление</h3>
             <Segmented label="Тема" value={settings.theme} onChange={(v) => set({ theme: v })} options={[{ value: "dark", label: "Тёмная" }, { value: "light", label: "Светлая" }]} />
@@ -226,6 +229,71 @@ function CloudModels({ settings, set }: { settings: Settings; set: (changes: Par
         Ключи хранятся в файле <code>.env</code> в папке приложения и никуда не отправляются, кроме самих сервисов. Модели
         получают только факты игры: героя, уровень, время, золото, предметы, союзников и замеченных врагов, режим — и
         список вариантов, которые уже предложили правила. Без ключей, при ошибке или после лимита советуют только правила.
+      </p>
+    </div>
+  );
+}
+
+const HINTS: { group: HintGroup; label: string }[] = [
+  { group: "skills", label: "Способности и таланты" },
+  { group: "items", label: "Предметы (основные, ситуативные, защитные)" },
+  { group: "buyback", label: "Предупреждение о выкупе" },
+  { group: "draft", label: "Пики на драфте (оверлей)" },
+];
+
+/** Which kinds of hints he sees on the Copilot panel and the overlay. Hidden ones cost no cloud calls. */
+function Hints({ settings, set }: { settings: Settings; set: (changes: Partial<Settings>) => void }) {
+  const hidden = new Set(settings.hidden_hints);
+  const toggle = (g: HintGroup, on: boolean) => {
+    const next = new Set(hidden);
+    if (on) next.delete(g);
+    else next.add(g);
+    set({ hidden_hints: [...next] });
+  };
+  return (
+    <div>
+      <h3>Какие подсказки показывать</h3>
+      {HINTS.map((h) => (
+        <label key={h.group} className="check small">
+          <input type="checkbox" checked={!hidden.has(h.group)} onChange={(e) => toggle(h.group, e.target.checked)} />
+          {h.label}
+        </label>
+      ))}
+      <p className="small muted">Выключенные подсказки не показываются и не отправляются облачным моделям; разбор после игры их всё равно учитывает.</p>
+    </div>
+  );
+}
+
+/** Forget the journal, and a secret-free diagnostics file for bug reports. */
+function History() {
+  const remove = useDeleteHistory();
+  const [armed, setArmed] = useLocalState(false);
+  return (
+    <div>
+      <h3>История и диагностика</h3>
+      <div className="row">
+        {!armed ? (
+          <button className="btn danger" type="button" onClick={() => setArmed(true)}>
+            Удалить историю советов и разборов…
+          </button>
+        ) : (
+          <>
+            <button className="btn danger" type="button" disabled={remove.isPending} onClick={() => remove.mutate(undefined, { onSettled: () => setArmed(false) })}>
+              Да, удалить всё
+            </button>
+            <button className="btn" type="button" onClick={() => setArmed(false)}>
+              Отмена
+            </button>
+          </>
+        )}
+        <a className="btn" href="/api/copilot/diagnostics" download="d2bg-diagnostics.json">
+          Скачать диагностику
+        </a>
+      </div>
+      {remove.isSuccess && <p className="small">История удалена. Записи игр остались в папке приложения.</p>}
+      <p className="small muted">
+        Удаляются матчи, советы, разборы, цели и журнал облачных вызовов. Диагностика — файл без токенов, ключей и имени
+        пользователя, его можно приложить к сообщению об ошибке.
       </p>
     </div>
   );

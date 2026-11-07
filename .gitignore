@@ -55,3 +55,7 @@ web/playwright-report/
 
 # Local secrets (API keys). .env.example is the template that goes into git.
 .env
+
+# Single-file build (build-exe.cmd): PyInstaller work folder and the exe
+/build/
+/dist/

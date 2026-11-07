@@ -183,6 +183,48 @@ def goals(svc: Svc) -> dict[str, Any]:
     return {"goals": svc.copilot.store.goals(10), "recurring": coach.recurring(svc.copilot.store)}
 
 
+@router.get("/diagnostics")
+def diagnostics(svc: Svc) -> dict[str, Any]:
+    """What a bug report needs, without secrets: no tokens, no keys, the home folder shown as ~."""
+    import json
+    import platform
+    import sys
+    from dataclasses import asdict
+    from pathlib import Path
+
+    from d2bg import __version__
+
+    report = {
+        "generated_at": time.time(),
+        "app_version": __version__,
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "frozen": bool(getattr(sys, "frozen", False)),
+        "patch": svc.ctx.data.patch,
+        "settings": svc.ctx.settings.get().public_view(),
+        "data": svc.ctx.data.status(),
+        "gsi": svc.engine.connection(),
+        "copilot": {
+            "journal": svc.copilot.store.counts(),
+            "rejected": svc.copilot.rejected,
+            "error": svc.copilot_error,
+            "providers": svc.hybrid.status(svc.copilot.context.match_id),
+            "provider_usage": svc.copilot.store.provider_usage(),
+            "hybrid_error": svc.hybrid.last_error,
+        },
+        "screen_reader": {"running": svc.cv_seen_at is not None and time.time() - svc.cv_seen_at < 5},
+        "refresh": asdict(svc.refresh),
+        "postgame": svc.postgame.status(),
+    }
+    text = json.dumps(report, ensure_ascii=False, default=str)
+    for secret in (svc.ctx.settings.get().gsi_token, svc.ctx.settings.get().lan_token):
+        text = text.replace(secret, "***")
+    home = str(Path.home())
+    text = text.replace(json.dumps(home)[1:-1], "~").replace(home, "~")
+    out: dict[str, Any] = json.loads(text)
+    return out
+
+
 @router.delete("/history")
 def delete_history(request: Request, svc: Svc) -> dict[str, bool]:
     """Forget every match, piece of advice, report and goal in the journal (recordings stay)."""

@@ -254,11 +254,14 @@ def build(
         return out
     snap = engine.snapshot()
     hero_id = engine.own_hero
-    if s.phase == "hero_selection" and hero_id is None and "draft" in snap:
+    hidden = set(settings.hidden_hints)
+    if s.phase == "hero_selection" and hero_id is None and "draft" in snap and "draft" not in hidden:
         out["draft"] = _draft(app, settings, snap["draft"])
     if hero_id is None:
         return out
-    if s.phase in BEFORE_HORN or s.phase == "hero_selection":
+    if "items" in hidden:
+        pass
+    elif s.phase in BEFORE_HORN or s.phase == "hero_selection":
         out["items"] = _starting(app, hero_id, mode)
     elif (
         s.phase == "in_game"
@@ -267,6 +270,6 @@ def build(
     ):
         # GSI does not say when the shop is open: dead or in base is when he can shop.
         out["items"] = _next(app, hero_id, mode, snap, set(s.owned_items))
-    if s.phase in ("pre_game", "in_game"):
+    if s.phase in ("pre_game", "in_game") and "skills" not in hidden:
         out["skill"] = _skill(app, hero_id, snap, recs)
     return out
