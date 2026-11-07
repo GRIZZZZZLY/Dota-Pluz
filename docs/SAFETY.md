@@ -14,6 +14,7 @@ sends input, and the only file it writes into the Dota folder is the GSI config.
 | `https://api.opendota.com` | HTTPS requests, about 1 per second at most, cached on disk | Hero, item, meta, matchup and benchmark data, your public profile and matches, replay-parse requests. |
 | `https://cdn.cloudflare.steamstatic.com` | Image downloads by your browser; and, once, by `d2bg-cv templates` | Hero and item pictures from Valve's public CDN. The optional screen reader uses the hero pictures as recognition templates. |
 | `%LOCALAPPDATA%\d2bg\` | Read and write | Settings, API cache, refreshed data, GSI recordings, the Copilot journal (`copilot.sqlite3`), and for the optional screen reader its templates and calibration (`cv\`). |
+| `https://api.typesafe.ai`, `https://api.forgetapi.ru` (only with keys in `.env`) | HTTPS requests from the Copilot, at most 20 + 5 per match by default, never in a demo or replay unless allowed in Settings | Optional cloud models (stage 4). They receive game facts only: hero, level, game time, gold, item names, allied and seen enemy heroes, the game mode, and the item or talent options the local rules already chose. No account id, name, screenshot or key. |
 | Your main monitor (optional `d2bg-cv` only) | Screen capture, about twice a second | Only while d2bg reports the hero selection or strategy time of a real game (never a demo or a replay), to read the heroes on the draft screen. Frames stay in memory; nothing is saved unless you run `d2bg-cv snap`, which saves one frame. |
 
 ## Things the app never does

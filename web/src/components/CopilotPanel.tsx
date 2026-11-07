@@ -1,5 +1,5 @@
 import { useCopilotAdvice, useCopilotStatus, useDismissAdvice } from "../api/hooks";
-import type { LiveSnapshot, Recommendation } from "../api/types";
+import type { LiveSnapshot, Providers, Recommendation } from "../api/types";
 import { adviceLabel, dataState, quickbuyHint, sortAdvice } from "../lib/copilot";
 import { clock, gold } from "../lib/format";
 import { useItemMap } from "./common";
@@ -12,7 +12,11 @@ export function CopilotPanel({ snap }: { snap: LiveSnapshot }) {
   const items = useItemMap();
   const state = dataState(status);
   const abilityName = new Map((snap.skills?.abilities ?? []).map((a) => [a.key, a.name]));
-  const shown = sortAdvice(advice ?? []);
+  // Cloud models' opinions sit under the rules' advice of the same kind, not as cards of their own.
+  const shown = sortAdvice((advice ?? []).filter((r) => r.source === "baseline"));
+  const opinions = new Map(
+    (advice ?? []).filter((r) => r.source !== "baseline").map((r) => [`${r.type}:${r.category ?? ""}`, r]),
+  );
 
   function title(rec: Recommendation): string {
     if (rec.type === "SKILL_LEVEL") return abilityName.get(rec.candidate_id) ?? rec.candidate_id;
@@ -50,6 +54,7 @@ export function CopilotPanel({ snap }: { snap: LiveSnapshot }) {
               )}
             </div>
             <p className="small">{rec.reason_ru}</p>
+            <Opinion rec={rec} opinion={opinions.get(`${rec.type}:${rec.category ?? ""}`)} name={title} />
             {rec.type.startsWith("ITEM_") && rec.type !== "ITEM_BUYBACK_GUARD" && (
               <details className="small muted">
                 <summary>Как купить</summary>
@@ -61,9 +66,34 @@ export function CopilotPanel({ snap }: { snap: LiveSnapshot }) {
       })}
       {status && (
         <p className="muted small">
-          Источник: офлайн-правила{status.error ? ` · ошибка Copilot: ${status.error}` : ""}
+          Источник: офлайн-правила{cloudLine(status.providers)}
+          {status.error ? ` · ошибка Copilot: ${status.error}` : ""}
         </p>
       )}
     </section>
   );
+}
+
+/** What a cloud model thinks of the rules' advice: agreement, or its pick with the advisor's reason. */
+function Opinion({ rec, opinion, name }: { rec: Recommendation; opinion?: Recommendation; name: (r: Recommendation) => string }) {
+  if (!opinion) return null;
+  const who = opinion.source === "hybrid" ? "Jev + DeepSeek" : "Jev";
+  const conf = opinion.confidence != null ? `, уверенность модели ${Math.round(opinion.confidence * 100)}%` : "";
+  if (opinion.candidate_id === rec.candidate_id && opinion.source === "jev") {
+    return <p className="small muted">✓ {who} согласен{conf}</p>;
+  }
+  return (
+    <p className="small opinion">
+      <strong>{who}:</strong> {opinion.candidate_id === rec.candidate_id ? "лучше этот вариант" : `альтернатива — ${name(opinion)}`}. {opinion.source === "hybrid" ? opinion.reason_ru : ""}
+      <span className="muted">{conf}. Это оценка модели, не вероятность победы.</span>
+    </p>
+  );
+}
+
+function cloudLine(p: Providers | undefined): string {
+  if (!p || p.mode === "baseline") return "";
+  const on = [p.jev.configured && "Jev", p.mode === "hybrid" && p.advisor.configured && "DeepSeek"].filter(Boolean);
+  if (!on.length) return " · облачные модели выключены: нет ключей в .env";
+  const down = [p.jev, p.advisor].find((x) => x.configured && x.online === false);
+  return ` + ${on.join(", ")}${down ? ` (ошибка: ${down.error})` : ""}`;
 }

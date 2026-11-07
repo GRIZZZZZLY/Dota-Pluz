@@ -9,7 +9,7 @@ from typing import Annotated
 
 import typer
 
-from d2bg import __version__, paths
+from d2bg import __version__, apikeys, paths
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Dota 2 companion (GSI + public data).")
 data_app = typer.Typer(no_args_is_help=True, help="Refresh and inspect the data snapshot.")
@@ -168,8 +168,10 @@ def serve(
     from d2bg.gsi import recorder
     from d2bg.gsi.demo import demo_frames
 
+    apikeys.load_env()  # cloud model keys from .env, if he put any there
     application = create_app(port=port, lan=lan)
     svc = application.state.services
+    svc.hybrid.start()  # cloud models answer on their own thread; without keys it idles
     if svc.turbo_due():
         svc.start_refresh(["turbo"])  # once a day, in the background; Settings can switch it off
     if demo:

@@ -48,3 +48,12 @@ def shared_ctx(data: DataStore) -> AppContext:
         settings=SettingsStore(tmp / "settings.json"),
         client=NoNetworkClient(cache_dir=tmp / "cache", min_interval=0, sleep=lambda s: None),
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_cloud_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach a paid API: keys from the developer's environment are hidden from them."""
+    from d2bg import apikeys
+
+    for name in apikeys.KEYS:
+        monkeypatch.delenv(name, raising=False)

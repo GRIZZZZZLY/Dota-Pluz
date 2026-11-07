@@ -1256,3 +1256,8 @@ html:has(.hud) body {
   color: var(--dire);
   font-size: 0.7rem;
 }
+
+.opinion {
+  border-left: 2px solid var(--river);
+  padding-left: 0.4rem;
+}

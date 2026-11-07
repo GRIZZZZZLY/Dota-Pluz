@@ -14,6 +14,7 @@ from fastapi import Request
 from d2bg import paths
 from d2bg.context import AppContext
 from d2bg.copilot import hud
+from d2bg.copilot.hybrid import Hybrid
 from d2bg.copilot.pipeline import Copilot
 from d2bg.copilot.store import CopilotStore
 from d2bg.gsi.recorder import Player, Recorder
@@ -39,7 +40,10 @@ class Services:
         self.postgame = PostGame(ctx)
         self.player: Player | None = None
         self.refresh = RefreshJob()
-        self.copilot = Copilot(ctx, CopilotStore(paths.copilot_db_file()))
+        store = CopilotStore(paths.copilot_db_file())
+        # Cloud models (stage 4): idle without keys; `d2bg serve` starts their worker thread.
+        self.hybrid = Hybrid(ctx, store, mode_of=lambda: self.game_mode()[0])
+        self.copilot = Copilot(ctx, store, hybrid=self.hybrid)
         self.copilot_error: str | None = None
         # When d2bg-cv last asked for the status: the screen reader is running if that was recent.
         self.cv_seen_at: float | None = None

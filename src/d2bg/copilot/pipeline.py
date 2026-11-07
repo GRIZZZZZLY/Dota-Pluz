@@ -16,7 +16,8 @@ from typing import Any
 
 from d2bg.context import AppContext
 from d2bg.copilot import baseline
-from d2bg.copilot.models import CopilotEvent, EventType, GameContext, RecStatus, Source
+from d2bg.copilot.hybrid import Hybrid, Job
+from d2bg.copilot.models import CopilotEvent, EventType, GameContext, Recommendation, RecStatus, Source
 from d2bg.copilot.store import CopilotStore
 from d2bg.live.engine import LiveEngine
 
@@ -192,7 +193,13 @@ def _closing_status(
 class Copilot:
     """Keeps the latest GameContext and journals events and recommendations for one app."""
 
-    def __init__(self, app: AppContext, store: CopilotStore, clock: Callable[[], float] = time.time) -> None:
+    def __init__(
+        self,
+        app: AppContext,
+        store: CopilotStore,
+        clock: Callable[[], float] = time.time,
+        hybrid: Hybrid | None = None,
+    ) -> None:
         self.app = app
         self.store = store
         self._clock = clock
@@ -200,13 +207,45 @@ class Copilot:
         self.context = GameContext(patch=app.data.patch)
         # "TYPE:category" -> (recommendation id, candidate, evidence) shown now.
         self._active: dict[str, tuple[str, str, tuple[str, ...]]] = {}
+        # A cloud model's opinion on the advice in the same slot: "TYPE:category" -> (row id, candidate).
+        self._models: dict[str, tuple[str, str]] = {}
         # Candidates the validator refused at the last recompute, for the status page.
         self.rejected: list[dict[str, str]] = []
+        self.hybrid = hybrid
+        if hybrid is not None:
+            hybrid.copilot = self
 
     def _close_all(self) -> None:
         for rec_id, _, _ in self._active.values():
             self.store.set_status(rec_id, "expired")
+        for rec_id, _ in self._models.values():
+            self.store.set_status(rec_id, "expired")
         self._active.clear()
+        self._models.clear()
+
+    # Called by the hybrid policy from its own thread.
+
+    def is_current(self, key: str, rec_id: str) -> bool:
+        return self._active.get(key, ("",))[0] == rec_id
+
+    def adopt(self, key: str, rec_id: str, opinion: Recommendation) -> bool:
+        """Journal a model's opinion on the advice ``rec_id``, if that advice is still the shown one."""
+        with self._lock:
+            if not self.is_current(key, rec_id):
+                return False
+            old = self._models.pop(key, None)
+            if old is not None:
+                self.store.set_status(old[0], "expired")
+            self.store.save_recommendation(opinion, self._clock())
+            self._models[key] = (opinion.id, opinion.candidate_id)
+            return True
+
+    def revise(self, key: str, opinion_id: str, candidate: str, reason_ru: str) -> None:
+        """The advisor settled a disagreement: its pick and reason replace the opinion's."""
+        with self._lock:
+            if self._models.get(key, ("",))[0] == opinion_id:
+                self.store.revise(opinion_id, candidate, reason_ru, "hybrid")
+                self._models[key] = (opinion_id, candidate)
 
     def observe(
         self, engine: LiveEngine, source: str, recording: tuple[str, int] | None = None
@@ -251,8 +290,15 @@ class Copilot:
                 kind = key.split(":")[0]
                 self.store.set_status(rec_id, _closing_status(kind, candidate, events, changed_talents))
                 del self._active[key]
+                if key in self._models:
+                    model_id, model_candidate = self._models.pop(key)
+                    self.store.set_status(
+                        model_id, _closing_status(kind, model_candidate, events, changed_talents)
+                    )
             for key, rec in produced.items():
                 if key not in self._active:
                     self.store.save_recommendation(rec, now)
                     self._active[key] = (rec.id, rec.candidate_id, tuple(rec.evidence_ids))
+                    if self.hybrid is not None:
+                        self.hybrid.submit(Job(key, rec, cur, source))
             return events

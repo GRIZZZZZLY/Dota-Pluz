@@ -363,6 +363,7 @@ export interface Settings {
   auto_post_game: boolean;
   turbo_collect: boolean;
   game_mode: "auto" | "turbo" | "normal";
+  providers: ProviderPrefs;
   request_parse: boolean;
   lan_mode: boolean;
   theme: "dark" | "light";
@@ -548,6 +549,36 @@ export interface Recommendation {
   expires_at: number | null;
 }
 
+export interface CloudProvider {
+  configured: boolean;
+  model: string;
+  /** Did the last call work; null before the first call. */
+  online: boolean | null;
+  error: string | null;
+  calls_this_match: number;
+  limit_per_match: number;
+  cost_usd_total: number;
+}
+
+export interface Providers {
+  mode: "baseline" | "jev" | "hybrid";
+  baseline: { configured: boolean; online: boolean };
+  jev: CloudProvider;
+  advisor: CloudProvider;
+}
+
+export interface ProviderPrefs {
+  mode: "baseline" | "jev" | "hybrid";
+  jev_per_match: number;
+  advisor_per_match: number;
+  jev_model: string;
+  advisor_base_url: string;
+  advisor_model: string;
+  in_demo: boolean;
+}
+
+export type ProviderTest = Record<"jev" | "advisor", { ok: boolean; latency_ms?: number; model?: string; error?: string; message?: string }>;
+
 export interface CopilotStatus {
   state: "no_data" | "stale" | "ok";
   mode: "game" | "demo" | "replay" | "none";
@@ -556,7 +587,7 @@ export interface CopilotStatus {
   patch: { data: string; timers: string };
   snapshot_generated_at: number | null;
   context: { sources: Record<string, string>; data_age_s: number | null; [key: string]: unknown };
-  providers: Record<string, { configured: boolean; online: boolean }>;
+  providers: Providers;
   journal: Record<string, number>;
   rejected: { type: string; candidate: string; reason: string }[];
   /** d2bg-cv asked for the status in the last few seconds. */

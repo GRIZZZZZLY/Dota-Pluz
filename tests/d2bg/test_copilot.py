@@ -68,6 +68,7 @@ def test_store_migrates_once_and_uses_wal(tmp_path):
         "gsi_events_index": 0,
         "recommendations": 0,
         "draft_observations": 0,
+        "provider_calls": 0,
     }
     again.close()
 
@@ -256,12 +257,15 @@ def test_status_without_data(client, ctx):
     assert r.status_code == 200
     body = r.json()
     assert body["state"] == "no_data" and body["mode"] == "none" and body["match_id"] is None
-    assert body["providers"] == {"baseline": {"configured": True, "online": True}}
+    providers = body["providers"]
+    assert providers["baseline"] == {"configured": True, "online": True}
+    assert not providers["jev"]["configured"] and not providers["advisor"]["configured"]  # no keys in tests
     assert body["journal"] == {
         "matches": 0,
         "gsi_events_index": 0,
         "recommendations": 0,
         "draft_observations": 0,
+        "provider_calls": 0,
     }
     assert body["patch"]["data"] == ctx.data.patch and body["error"] is None
     settings = ctx.settings.get()

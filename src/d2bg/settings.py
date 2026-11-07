@@ -31,6 +31,22 @@ class TimerPrefs(BaseModel):
     lead_seconds: int = Field(default=15, ge=0, le=120)
 
 
+class ProviderPrefs(BaseModel):
+    """Optional cloud models (stage 4). Keys live in .env, never here. Without keys the mode is moot:
+    the local rules answer alone."""
+
+    # baseline: local rules only; jev: Jev re-ranks the rules' candidates; hybrid: and when Jev
+    # disagrees with the rules, the advisor model explains which one to take.
+    mode: Literal["baseline", "jev", "hybrid"] = "hybrid"
+    jev_per_match: int = Field(default=20, ge=0, le=200)
+    advisor_per_match: int = Field(default=5, ge=0, le=50)
+    jev_model: str = "jev-latest"
+    advisor_base_url: str = "https://api.forgetapi.ru/v1"
+    advisor_model: str = "deepseek-v4-flash"
+    # Demo matches and replays spend no money unless he asks for it.
+    in_demo: bool = False
+
+
 class Settings(BaseModel):
     account_id: int | None = Field(default=None, ge=1)
     rank_bucket: RankBucket = "all"
@@ -49,6 +65,7 @@ class Settings(BaseModel):
     # Which builds to use: "auto" tells Turbo by passive gold in the first seconds after the horn (GSI does not say
     # the game mode) and otherwise keeps the last game's mode.
     game_mode: Literal["auto", "turbo", "normal"] = "auto"
+    providers: ProviderPrefs = Field(default_factory=ProviderPrefs)
     request_parse: bool = False
     lan_mode: bool = False
     theme: Literal["dark", "light"] = "dark"

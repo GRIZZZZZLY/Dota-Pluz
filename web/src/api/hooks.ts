@@ -17,6 +17,7 @@ import type {
   MatchReview,
   MetaResponse,
   Peer,
+  ProviderTest,
   PostGameJob,
   ProfileResponse,
   RankBucket,
@@ -139,6 +140,15 @@ export const useCopilotAdvice = () =>
     queryFn: () => api.get<Recommendation[]>("/api/copilot/recommendations?status=suggested"),
     refetchInterval: 500,
   });
+
+/** One tiny real call to each cloud model; only on his button press. */
+export function useTestProviders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ProviderTest>("/api/copilot/providers/test"),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["copilot-status"] }),
+  });
+}
 
 /** The overlay widgets' hints, polled once a second. */
 export const useHud = () => useQuery({ queryKey: ["hud"], queryFn: () => api.get<Hud>("/api/copilot/hud"), refetchInterval: 1000 });

@@ -85,6 +85,25 @@ MIGRATIONS = [
     );
     CREATE INDEX draft_observations_by_match ON draft_observations(match_id, created_at);
     """,
+    # 4: calls to the cloud models, stage 4: what was asked, how long it took, tokens and cost. Never
+    # a key or a request header.
+    """
+    CREATE TABLE provider_calls (
+        id INTEGER PRIMARY KEY,
+        match_id TEXT,
+        created_at REAL NOT NULL,
+        provider TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        model TEXT,
+        status TEXT NOT NULL,
+        latency_ms INTEGER,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        cost_usd REAL,
+        error TEXT
+    );
+    CREATE INDEX provider_calls_by_match ON provider_calls(match_id, provider);
+    """,
 ]
 _JSON_FIELDS = ("alternatives", "evidence_ids")
 
@@ -189,6 +208,47 @@ class CopilotStore:
                 ),
             )
 
+    def revise(self, rec_id: str, candidate_id: str, reason_ru: str, source: str) -> None:
+        """A second model settled the advice: its pick and its reason replace the shown row's."""
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE recommendations SET candidate_id = ?, reason_ru = ?, source = ? "
+                "WHERE id = ? AND status = 'suggested'",
+                (candidate_id, reason_ru, source, rec_id),
+            )
+
+    def add_provider_call(self, match_id: str | None, now: float, call: dict[str, Any]) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                "INSERT INTO provider_calls (match_id, created_at, provider, purpose, model, status, "
+                "latency_ms, input_tokens, output_tokens, cost_usd, error) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    match_id,
+                    now,
+                    call["provider"],
+                    call["purpose"],
+                    call.get("model"),
+                    call["status"],
+                    call.get("latency_ms"),
+                    call.get("input_tokens"),
+                    call.get("output_tokens"),
+                    call.get("cost_usd"),
+                    call.get("error"),
+                ),
+            )
+
+    def provider_usage(self, match_id: str | None = None) -> dict[str, dict[str, Any]]:
+        """Per provider: calls, failed calls, tokens and cost, for one match or all time."""
+        where, args = ("WHERE match_id = ?", (match_id,)) if match_id else ("", ())
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT provider, COUNT(*) AS calls, SUM(status != 'ok') AS failed, "  # noqa: S608 - fixed text
+                "COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens, "
+                f"COALESCE(SUM(cost_usd), 0) AS cost_usd FROM provider_calls {where} GROUP BY provider",
+                args,
+            ).fetchall()
+        return {r["provider"]: {k: r[k] for k in r.keys() if k != "provider"} for r in rows}  # noqa: SIM118
+
     def set_status(self, rec_id: str, status: RecStatus) -> bool:
         """Close a shown recommendation. Only a ``suggested`` one changes, so a dismissal sticks."""
         with self._lock, self._db:
@@ -261,5 +321,11 @@ class CopilotStore:
         with self._lock:
             return {
                 t: int(self._db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0])  # noqa: S608 - fixed table names
-                for t in ("matches", "gsi_events_index", "recommendations", "draft_observations")
+                for t in (
+                    "matches",
+                    "gsi_events_index",
+                    "recommendations",
+                    "draft_observations",
+                    "provider_calls",
+                )
             }

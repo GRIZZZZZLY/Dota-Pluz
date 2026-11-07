@@ -93,7 +93,7 @@ def status(svc: Svc, x_d2bg_client: Annotated[str | None, Header()] = None) -> d
         "patch": {"data": svc.ctx.data.patch, "timers": svc.ctx.timer_patch},
         "snapshot_generated_at": heroes_file.get("generated_at"),
         "context": context.model_dump(),
-        "providers": {"baseline": {"configured": True, "online": True}},
+        "providers": svc.hybrid.status(context.match_id),
         "journal": svc.copilot.store.counts(),
         "rejected": svc.copilot.rejected,
         "screen_reader": {"running": svc.cv_seen_at is not None and now - svc.cv_seen_at < 5},
@@ -113,6 +113,14 @@ def recommendations(
     if match is None:
         return []
     return [r.model_dump() for r in svc.copilot.store.recommendations(match, limit, status)]
+
+
+@router.post("/providers/test")
+def providers_test(request: Request, svc: Svc) -> dict[str, Any]:
+    """One tiny real call to each cloud model, by his button only (it costs a fraction of a cent)."""
+    if request.client is None or request.client.host not in LOOPBACK:
+        raise HTTPException(403, "Проверка облачных моделей — только с этого компьютера")
+    return svc.hybrid.test()
 
 
 @router.get("/hud")

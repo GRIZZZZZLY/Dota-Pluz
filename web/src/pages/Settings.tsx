@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { useHeroes, useSaveSettings, useSettings, useVersion } from "../api/hooks";
-import type { Settings } from "../api/types";
+import { useCopilotStatus, useHeroes, useSaveSettings, useSettings, useTestProviders, useVersion } from "../api/hooks";
+import type { CloudProvider, Settings } from "../api/types";
 import { ErrorBox, HeroChip, Loading, Segmented } from "../components/common";
 import { HeroPicker } from "../components/HeroPicker";
 import { BUCKETS } from "../lib/format";
@@ -149,6 +149,7 @@ export function SettingsPage() {
             </div>
             <p className="small muted">Повышает лимиты OpenDota. Создайте ключ сами на opendota.com; он хранится только на этом компьютере.</p>
           </div>
+          <CloudModels settings={settings} set={set} />
           <div>
             <h3>Оформление</h3>
             <Segmented label="Тема" value={settings.theme} onChange={(v) => set({ theme: v })} options={[{ value: "dark", label: "Тёмная" }, { value: "light", label: "Светлая" }]} />
@@ -164,5 +165,68 @@ export function SettingsPage() {
         </section>
       </div>
     </>
+  );
+}
+
+/** Stage 4: the optional cloud models. Keys stay in .env; this only shows whether each one is there. */
+function CloudModels({ settings, set }: { settings: Settings; set: (changes: Partial<Settings>) => void }) {
+  const { data: status } = useCopilotStatus();
+  const test = useTestProviders();
+  const p = settings.providers;
+  const put = (changes: Partial<Settings["providers"]>) => set({ providers: { ...p, ...changes } });
+  const row = (name: string, x: CloudProvider | undefined) =>
+    x && (
+      <li>
+        {name} ({x.model}): {x.configured ? "ключ есть" : "ключа нет в .env"}
+        {x.online === false ? `, ошибка: ${x.error}` : x.online ? ", работает" : ""} · за матч {x.calls_this_match} из{" "}
+        {x.limit_per_match} · всего ${x.cost_usd_total.toFixed(4)}
+      </li>
+    );
+  return (
+    <div>
+      <h3>Облачные модели</h3>
+      <Segmented
+        label="Кто советует"
+        value={p.mode}
+        onChange={(v) => put({ mode: v })}
+        options={[
+          { value: "baseline", label: "Только правила" },
+          { value: "jev", label: "Правила + Jev" },
+          { value: "hybrid", label: "Правила + Jev + DeepSeek" },
+        ]}
+      />
+      <ul className="small">
+        {row("Jev", status?.providers.jev)}
+        {row("DeepSeek", status?.providers.advisor)}
+      </ul>
+      <div className="row">
+        <label className="small">
+          Jev за матч <input className="input" type="number" min={0} max={200} value={p.jev_per_match} onChange={(e) => put({ jev_per_match: Number(e.target.value) })} style={{ width: "5rem" }} />
+        </label>
+        <label className="small">
+          DeepSeek за матч <input className="input" type="number" min={0} max={50} value={p.advisor_per_match} onChange={(e) => put({ advisor_per_match: Number(e.target.value) })} style={{ width: "5rem" }} />
+        </label>
+      </div>
+      <label className="check small">
+        <input type="checkbox" checked={p.in_demo} onChange={(e) => put({ in_demo: e.target.checked })} />
+        Спрашивать модели и в демо-матче и записях (тратит деньги)
+      </label>
+      <div className="row">
+        <button className="btn" type="button" disabled={test.isPending} onClick={() => test.mutate()}>
+          {test.isPending ? "Проверяем…" : "Проверить подключение"}
+        </button>
+        {test.data &&
+          (["jev", "advisor"] as const).map((k) => (
+            <span key={k} className={`tag${test.data[k].ok ? "" : " warn"}`}>
+              {k === "jev" ? "Jev" : "DeepSeek"}: {test.data[k].ok ? `работает, ${test.data[k].latency_ms} мс` : test.data[k].message}
+            </span>
+          ))}
+      </div>
+      <p className="small muted">
+        Ключи хранятся в файле <code>.env</code> в папке приложения и никуда не отправляются, кроме самих сервисов. Модели
+        получают только факты игры: героя, уровень, время, золото, предметы, союзников и замеченных врагов, режим — и
+        список вариантов, которые уже предложили правила. Без ключей, при ошибке или после лимита советуют только правила.
+      </p>
+    </div>
   );
 }
