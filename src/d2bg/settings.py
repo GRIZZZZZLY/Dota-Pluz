@@ -44,6 +44,11 @@ class Settings(BaseModel):
     record_gsi: bool = True
     keep_recordings: int = Field(default=20, ge=1, le=500)
     auto_post_game: bool = True
+    # Collect Turbo games of strong players once a day in the background (about 900 OpenDota requests).
+    turbo_collect: bool = True
+    # Which builds to use: "auto" tells Turbo by passive gold in the first seconds after the horn (GSI does not say
+    # the game mode) and otherwise keeps the last game's mode.
+    game_mode: Literal["auto", "turbo", "normal"] = "auto"
     request_parse: bool = False
     lan_mode: bool = False
     theme: Literal["dark", "light"] = "dark"

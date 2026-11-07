@@ -361,6 +361,8 @@ export interface Settings {
   record_gsi: boolean;
   keep_recordings: number;
   auto_post_game: boolean;
+  turbo_collect: boolean;
+  game_mode: "auto" | "turbo" | "normal";
   request_parse: boolean;
   lan_mode: boolean;
   theme: "dark" | "light";
@@ -560,4 +562,29 @@ export interface CopilotStatus {
   /** d2bg-cv asked for the status in the last few seconds. */
   screen_reader: { running: boolean };
   error: string | null;
+}
+
+export interface HudItem {
+  key: string;
+  name: string;
+  detail: string;
+}
+
+/** What the overlay's small widgets show now; a null widget stays hidden. */
+export interface Hud {
+  source: string;
+  mode: "turbo" | "normal" | null;
+  mode_source: "setting" | "gold_rate" | "last_game" | "unknown";
+  skill:
+    | { kind: "skill"; key: string; name: string; slot: number | null; reason: string }
+    | { kind: "talent"; key: string; name: string; instead: string[]; reason: string }
+    | null;
+  draft: {
+    position: number | null;
+    // Heroes the app knows in this draft: 0 until the screen reader runs (GSI sends none to a player).
+    heroes_known: number;
+    picks: { hero: number; name: string; why: string }[];
+    bans: { hero: number; name: string }[];
+  } | null;
+  items: { title: string; note: string; items: HudItem[] } | null;
 }

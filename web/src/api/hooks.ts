@@ -10,6 +10,7 @@ import type {
   GsiStatus,
   HeroDetail,
   HeroListRow,
+  Hud,
   ItemDetail,
   ItemRow,
   LiveSnapshot,
@@ -138,6 +139,9 @@ export const useCopilotAdvice = () =>
     queryFn: () => api.get<Recommendation[]>("/api/copilot/recommendations?status=suggested"),
     refetchInterval: 500,
   });
+
+/** The overlay widgets' hints, polled once a second. */
+export const useHud = () => useQuery({ queryKey: ["hud"], queryFn: () => api.get<Hud>("/api/copilot/hud"), refetchInterval: 1000 });
 
 export function useDismissAdvice() {
   const qc = useQueryClient();

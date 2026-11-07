@@ -92,6 +92,9 @@ class HeroState:
     smoked: bool | None = None
     attributes_level: int | None = None
     talents: list[bool] = field(default_factory=list)
+    # Where the hero stands on the map (GSI world units); the fountains are near (+-6700, +-6700).
+    xpos: int | None = None
+    ypos: int | None = None
 
 
 @dataclass
@@ -257,6 +260,8 @@ def _hero(raw: Mapping[str, Any], hero_ids: Mapping[str, int]) -> HeroState | No
         smoked=_bool(raw.get("smoked")),
         attributes_level=_int(raw.get("attributes_level")),
         talents=[bool(raw.get(f"talent_{i}")) for i in range(1, 9) if f"talent_{i}" in raw],
+        xpos=_int(raw.get("xpos")),
+        ypos=_int(raw.get("ypos")),
     )
 
 

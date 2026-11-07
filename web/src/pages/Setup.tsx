@@ -132,6 +132,9 @@ function Data() {
         <button className="btn" type="button" disabled={running} onClick={() => void start(["constants", "hero_stats"])}>
           Быстрое обновление (только мета)
         </button>
+        <button className="btn" type="button" disabled={running} onClick={() => void start(["turbo"])}>
+          Собрать игры Turbo сейчас
+        </button>
       </div>
       <ErrorBox error={error} />
       {running && prog.step && (

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from dataclasses import asdict
 from typing import Annotated, Any
 
@@ -10,10 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ValidationError
 
 from d2bg import __version__, paths
-from d2bg.api.services import RefreshJob, Services, services
+from d2bg.api.services import Services, services
 from d2bg.matches.review import review
 from d2bg.opendota import NotFoundError, OpenDotaError
-from d2bg.pipeline.refresh import STEPS, Refresher
+from d2bg.pipeline.refresh import SEPARATE, STEPS
 from d2bg.profile import service as profile_service
 
 router = APIRouter(prefix="/api")
@@ -138,33 +137,12 @@ class RefreshBody(BaseModel):
 
 @router.post("/data/refresh")
 def data_refresh(svc: Svc, body: RefreshBody) -> dict[str, Any]:
-    steps = body.steps or [s for s in STEPS if s != "draft_model"]
+    steps = body.steps or [s for s in STEPS if s not in SEPARATE]
     bad = [s for s in steps if s not in STEPS]
     if bad:
         raise HTTPException(422, f"Неизвестные шаги: {bad}")
-    with svc.lock:
-        if svc.refresh.running:
-            raise HTTPException(409, "Обновление уже идёт")
-        svc.refresh = RefreshJob(running=True, steps=steps)
-    job = svc.refresh
-
-    def progress(step: str, done: int, total: int, message: str) -> None:
-        job.progress = {"step": step, "done": done, "total": total, "message": message}
-
-    def run() -> None:
-        try:
-            refresher = Refresher(
-                svc.ctx.client, paths.refreshed_data_dir(), progress, seed_dir=paths.snapshot_dir()
-            )
-            for result in refresher.run(
-                steps, **({"max_calls": body.max_calls} if "matchups" in steps else {})
-            ):
-                job.results.append(asdict(result))
-            svc.ctx.reload()
-        except Exception as exc:  # reported to the UI, not swallowed
-            job.error = f"{type(exc).__name__}: {exc}"
-        finally:
-            job.running = False
-
-    threading.Thread(target=run, name="data-refresh", daemon=True).start()
+    try:
+        job = svc.start_refresh(steps, **({"max_calls": body.max_calls} if "matchups" in steps else {}))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
     return asdict(job)

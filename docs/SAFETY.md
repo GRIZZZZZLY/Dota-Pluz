@@ -34,6 +34,20 @@ process, input, capture or Windows-API libraries (`ctypes`, `pymem`, `pynput`, `
 `tests/d2bg/test_cv_safety.py` holds `d2bg-cv` to the same list with one exception, `mss` for the
 capture, which may live in one file only, and checks that the core app never imports it.
 
+### The overlay is a window over the game, not inside it
+
+`run-overlay.cmd` opens three small hint windows (what to skill, whom to pick, what to buy) that stay on
+top of Dota in borderless window mode, the way any window can sit over a borderless game. It is not an
+in-game overlay like Discord's or Steam's, which hook into the game's rendering; this app never does
+that. Each window asks the app's own local server once a second what to show
+(`/api/copilot/hud`, built from GSI data only) and is fully transparent while it has nothing to show.
+Windows passes clicks through the hint windows to the game (a window style, `WS_EX_TRANSPARENT`, set on
+the overlay's own windows only), and they never take keyboard focus from the game. A small handle at the
+screen edge unlocks them to move them, changes their opacity, and opens the full app maximized on the
+second monitor. The overlay reads nothing from the game and sends it nothing. `tests/d2bg/test_overlay.py`
+keeps the window-style calls in one file and to four functions (`FindWindowW`, `GetWindowLongW`,
+`SetWindowLongW`, `SetLayeredWindowAttributes`), and checks that the core app never imports it.
+
 ### Why reading the draft screen is a separate, optional process
 
 During a ranked draft the game does not send a player the enemy picks, but it shows them on screen.

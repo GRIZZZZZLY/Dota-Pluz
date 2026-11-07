@@ -35,7 +35,9 @@ def version() -> None:
 def data_refresh(
     steps: Annotated[str, typer.Option(help="Comma-separated steps, or 'all'.")] = "all",
     to_snapshot: Annotated[bool, typer.Option(help="Write into the committed data/snapshot.")] = False,
-    max_calls: Annotated[int, typer.Option(help="Max /publicMatches pages for the matchups step.")] = 600,
+    max_calls: Annotated[
+        int, typer.Option(help="Max requests for the matchups and turbo steps (pages, or pages and matches).")
+    ] = 600,
     import_pages: Annotated[
         Path | None, typer.Option(help="Build matchups from saved /publicMatches pages instead.")
     ] = None,
@@ -53,12 +55,17 @@ def data_refresh(
             typer.echo(f"  {step}: {done}/{total} {message}", err=True)
 
     refresher = Refresher(client, out, progress, seed_dir=None if to_snapshot else paths.snapshot_dir())
-    chosen = list(STEPS) if steps == "all" else [s.strip() for s in steps.split(",") if s.strip()]
+    chosen = (
+        [s for s in STEPS if s != "turbo"]
+        if steps == "all"
+        else [s.strip() for s in steps.split(",") if s.strip()]
+    )
     if import_pages is not None:
         result = refresher.import_public_pages(import_pages)
         typer.echo(f"matchups: {result.rows} matches from {import_pages}")
         chosen = [s for s in chosen if s != "matchups"]
-    for result in refresher.run(chosen, **({"max_calls": max_calls} if "matchups" in chosen else {})):
+    capped = {"matchups", "turbo"} & set(chosen)
+    for result in refresher.run(chosen, **({"max_calls": max_calls} if capped else {})):
         typer.echo(
             f"{result.step}: {result.rows} rows, {result.calls} API calls, {result.seconds}s "
             f"{result.note}".rstrip()
@@ -163,6 +170,8 @@ def serve(
 
     application = create_app(port=port, lan=lan)
     svc = application.state.services
+    if svc.turbo_due():
+        svc.start_refresh(["turbo"])  # once a day, in the background; Settings can switch it off
     if demo:
         svc.start_player(demo_frames(svc.ctx, demo), "demo", speed)
     elif replay:

@@ -121,6 +121,18 @@ export function SettingsPage() {
               <input type="checkbox" checked={settings.record_gsi} onChange={(e) => set({ record_gsi: e.target.checked })} />
               Записывать игры на этом компьютере для воспроизведения (хранятся последние, не больше {settings.keep_recordings})
             </label>
+            <label className="check small">
+              <input type="checkbox" checked={settings.turbo_collect} onChange={(e) => set({ turbo_collect: e.target.checked })} />
+              Раз в день собирать игры Turbo сильных игроков (Божество и выше) для сборок Turbo: около 900 запросов к OpenDota
+            </label>
+            <label className="small">
+              Сборки для режима{" "}
+              <select className="input" value={settings.game_mode} onChange={(e) => set({ game_mode: e.target.value as typeof settings.game_mode })}>
+                <option value="auto">определять сам (по золоту в первые секунды после горна)</option>
+                <option value="turbo">всегда Turbo</option>
+                <option value="normal">всегда обычная игра</option>
+              </select>
+            </label>
           </div>
           <div>
             <h3>API-ключ OpenDota (необязательно)</h3>

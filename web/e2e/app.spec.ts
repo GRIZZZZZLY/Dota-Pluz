@@ -103,6 +103,20 @@ test("compact view shows the Copilot's advice and labels the demo", async ({ pag
   await request.post("/api/live/reset");
 });
 
+test("an overlay widget shows its hint, labels the demo and has no scrollbars", async ({ page, request }) => {
+  await request.post("/api/demo", { data: { hero: "juggernaut", speed: 2, minutes: 3 } });
+  await page.setViewportSize({ width: 320, height: 176 });
+  await page.goto("/hud/items");
+  await expect(page.getByText(/^Старт ·/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("демо")).toBeVisible();
+  const clipped = await page.evaluate("getComputedStyle(document.documentElement).overflow");
+  expect(clipped).toBe("hidden");
+  await page.screenshot({ path: "test-results/hud-items.png" });
+  await page.goto("/hud/draft");
+  await expect(page.getByText("Подсказка: кого взять")).toBeVisible(); // no draft now: the placeholder he drags in setup
+  await request.post("/api/live/reset");
+});
+
 test("the draft board sends his corrections to the Copilot during a match", async ({ page, request }) => {
   await request.post("/api/demo", { data: { hero: "juggernaut", speed: 1, minutes: 3 } });
   await page.goto("/draft");

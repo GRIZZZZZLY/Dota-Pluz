@@ -1220,3 +1220,39 @@ code {
   min-width: 0;
   overflow-x: auto;
 }
+
+/* Overlay hint widgets: one small window each, no scrollbars. */
+html:has(.hud),
+html:has(.hud) body {
+  overflow: hidden;
+  background: var(--slate);
+}
+.hud {
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  overflow: hidden;
+}
+.hud-title {
+  margin-bottom: 0.15rem;
+  color: var(--gold);
+  font-size: 0.75rem;
+}
+.hud-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.15rem 0;
+}
+.hud-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+.hud-demo {
+  float: right;
+  color: var(--dire);
+  font-size: 0.7rem;
+}

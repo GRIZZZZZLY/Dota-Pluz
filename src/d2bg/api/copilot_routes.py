@@ -10,6 +10,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from d2bg.api.services import Services, services
+from d2bg.copilot import hud
 from d2bg.copilot.models import DraftObservation, ManualDraft, RecStatus
 
 router = APIRouter(prefix="/api/copilot")
@@ -112,6 +113,15 @@ def recommendations(
     if match is None:
         return []
     return [r.model_dump() for r in svc.copilot.store.recommendations(match, limit, status)]
+
+
+@router.get("/hud")
+def hud_hints(svc: Svc) -> dict[str, Any]:
+    """What the overlay's small widgets show now; a None widget stays hidden."""
+    match = svc.copilot.context.match_id
+    recs = svc.copilot.store.recommendations(match, 20, "suggested") if match else []
+    mode, mode_source = svc.game_mode()
+    return hud.build(svc.ctx, svc.engine, svc.ctx.settings.get(), recs, mode, mode_source)
 
 
 @router.post("/recommendations/{rec_id}/dismiss")

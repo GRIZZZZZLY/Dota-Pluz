@@ -33,6 +33,8 @@ DATA_FILES = (
     "pro_builds.json",
     "draft_model.json",
     "public_matches.jsonl.gz",
+    "turbo_builds.json",
+    "turbo_matches.jsonl.gz",
 )
 OPTIONAL = {
     "item_popularity.json",
@@ -42,6 +44,8 @@ OPTIONAL = {
     "pro_builds.json",
     "draft_model.json",
     "public_matches.jsonl.gz",
+    "turbo_builds.json",
+    "turbo_matches.jsonl.gz",
 }
 
 

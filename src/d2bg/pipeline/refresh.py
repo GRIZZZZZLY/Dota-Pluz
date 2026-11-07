@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from d2bg.opendota import DAY, OpenDotaClient
-from d2bg.pipeline import matchups, transform
+from d2bg.pipeline import matchups, transform, turbo
 
 Progress = Callable[[str, int, int, str], None]
 
@@ -30,7 +30,11 @@ STEPS = (
     "pro_builds",
     "matchups",
     "draft_model",
+    "turbo",
 )
+# Run on their own, not by "refresh everything": retraining needs an extra, and Turbo collection
+# spends about a third of the daily OpenDota allowance and runs once a day by itself.
+SEPARATE = {"draft_model", "turbo"}
 # Steps that make one call per hero; the rest make a handful.
 PER_HERO = {"item_popularity", "benchmarks", "item_timings", "lane_roles", "pro_builds"}
 
@@ -360,6 +364,44 @@ class Refresher:
         )
         return res
 
+    def turbo(self, max_calls: int = 900, days: int = 21) -> StepResult:
+        """Turbo games of Divine-and-better players: new ones join the store, which keeps ``days``."""
+        from d2bg.datastore import DataStore
+
+        data = DataStore(refreshed=self.out)
+        store = self.out / "turbo_matches.jsonl.gz"
+        kept = {int(r["match_id"]): r for r in read_matches_gz(store)} if store.exists() else {}
+        c0 = self.client.requests_made
+        new = turbo.collect(
+            self.client,
+            set(kept),
+            data.load("ids.json")["items"],
+            max_calls,
+            progress=lambda done, total: self.progress("turbo", done, total, "запросы к OpenDota"),
+        )
+        kept.update((r["match_id"], r) for r in new)
+        newest = max((m["start_time"] for m in kept.values()), default=0)
+        rows = sorted(
+            (m for m in kept.values() if m["start_time"] >= newest - days * 86400),
+            key=lambda m: m["match_id"],
+        )
+        write_matches_gz(store, rows)
+        doc = turbo.aggregate(rows, data.items.cost)
+        write_json(self.out / "turbo_builds.json", doc)
+        res = StepResult(
+            "turbo", ["turbo_builds.json", "turbo_matches.jsonl.gz"], len(rows), self._calls_since(c0)
+        )
+        parsed = sum(1 for m in rows if any(p["buys"] for p in m["players"]))
+        for f in res.files:
+            self._record(
+                f,
+                "OpenDota /publicMatches + /matches (Turbo, Божество и выше)",
+                len(rows),
+                res.calls,
+                parsed=parsed,
+            )
+        return res
+
     def run(self, steps: Iterable[str] = STEPS, **kwargs: Any) -> list[StepResult]:
         results = []
         for step in steps:
@@ -368,7 +410,7 @@ class Refresher:
             started = time.monotonic()
             self.progress(step, 0, 1, "начало")
             fn = getattr(self, step)
-            result: StepResult = fn(**kwargs) if step == "matchups" else fn()
+            result: StepResult = fn(**kwargs) if step in ("matchups", "turbo") else fn()
             result.seconds = round(time.monotonic() - started, 1)
             self.progress(step, 1, 1, "готово")
             results.append(result)
